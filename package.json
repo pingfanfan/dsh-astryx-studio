@@ -1,6 +1,6 @@
 {
   "name": "dsh-astryx-studio",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Build pages with Meta's Astryx design system inside DeepSeek Harness: structured Astryx tools, a verify hook, a live preview tab and a template gallery.",
   "type": "module",
   "main": "./lib/index.js",
