@@ -8,6 +8,7 @@
 import { UserMessage } from "@deepseek-ai/dsh-llm";
 import Schema from "@deepseek-ai/schemastery";
 import { Context } from "@deepseek-ai/cordis";
+import { SubprocessRuntime } from "@deepseek-ai/dsh-subprocess";
 interface CliResponse {
   readonly type: string;
   readonly data: unknown;
@@ -32,14 +33,24 @@ interface AstryxApi {
     type?: SearchDomain;
     limit?: number;
   }): Promise<CliResponse>;
+  /** `overwrite` is not accepted here: render replaces a file it rendered before, and rejects --overwrite outside --reverse. */
   render(file: string, options: {
     cwd: string;
     out?: string;
-    overwrite?: boolean;
   }): Promise<CliResponse>;
 }
 type SearchDomain = 'component' | 'hook' | 'doc' | 'template' | 'theme';
 declare function loadAstryxApi(): Promise<AstryxApi>;
+/** The slice of a spawned process the server needs (adapted from SubprocessHandle). */
+interface SpawnedProcess {
+  onOutput(listener: (chunk: string) => void): void;
+  readonly done: Promise<{
+    exitCode: number | null;
+    signal: string | null;
+  }>;
+  terminate(): void;
+}
+type Spawner = (argv: readonly string[], cwd: string) => SpawnedProcess;
 export interface Config {
   /** Folder (relative to the session cwd) the built-in scaffold creates when cwd is not an Astryx project. */
   appDir: string;
@@ -87,6 +98,10 @@ export declare function verifyMessage(body: string): UserMessage;
 export interface Overrides {
   run?: Runner;
   api?: typeof loadAstryxApi;
+  /** Replaces ctx.subprocess for the preview Vite. */
+  spawner?: Spawner;
 }
+/** Adapt DSH's `ctx.subprocess` to the preview server's spawner. */
+export declare function subprocessSpawner(subprocess: SubprocessRuntime): Spawner;
 export declare function apply(ctx: Context, config?: Partial<Config>, overrides?: Overrides): void;
 export {};

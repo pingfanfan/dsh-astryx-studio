@@ -71,6 +71,8 @@ export interface VerifierDeps {
   readonly tsc: TscScheduler
   readonly maxReportedErrors: number
   readonly readFile?: (file: string) => string | undefined
+  /** Footer status for the preview tab: called on every sync result and every finished tsc run. */
+  readonly onStatus?: (workspace: string, status: { state: 'running' | 'pass' | 'fail' | 'unverified'; summary: string }) => void
 }
 
 const defaultRead = (file: string) => (existsSync(file) ? readFileSync(file, 'utf8') : undefined)
@@ -128,8 +130,19 @@ export class Verifier {
       if (syntax.length > 0 || lint.length > 0) reports.push({ file: relative(workspace, file), syntax, lint })
     }
     if (input.agentId) this.agentWorkspace.set(input.agentId, workspace)
+    this.deps.onStatus?.(workspace, reports.length > 0
+      ? { state: 'fail', summary: this.formatReports(reports).split('\n').slice(1, 3).join(' · ') }
+      : { state: 'running', summary: 'tsc …' })
     // Syntax errors make tsc noise; still start it so the newest write always owns the run.
-    void this.deps.tsc.schedule(workspace)
+    const syncFailed = reports.length > 0
+    void this.deps.tsc.schedule(workspace).then((outcome) => {
+      if (!outcome || syncFailed) return
+      const text = this.formatTsc(outcome)
+      this.deps.onStatus?.(workspace, {
+        state: outcome.kind,
+        summary: outcome.kind === 'fail' ? text.split('\n').slice(0, 2).join(' · ') : text,
+      })
+    })
     return reports
   }
 

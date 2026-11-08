@@ -53,3 +53,48 @@ describe.runIf(process.env.ASTRYX_E2E === '1')('real scaffold → template → v
     expect(vite.code).toBe(0)
   })
 })
+
+describe.runIf(process.env.ASTRYX_E2E === '1')('real preview Vite', () => {
+  it('harness serves the page and blocks the rest of the workspace', { timeout: 600_000 }, async () => {
+    const { spawn } = await import('node:child_process')
+    const { PreviewManager } = await import('../src/preview/manager.js')
+    const cwd = tempProject({}, false)
+    const tsc = createTscScheduler({ run: runProcess, timeoutMs: 120_000 })
+    const tools = createTools({ api: loadAstryxApi, cwdOf: async () => cwd, config: DEFAULT_CONFIG, run: runProcess, tsc })
+    const exec = { signal: new AbortController().signal } as ToolRunContext
+    const v = (await (tools.find((t) => t.name === TOOL_NAMES.template) as ToolDefinition).execute({ id: 'dashboard' }, exec)) as { workspace: string; file: string }
+    writeFileSync(join(v.workspace, 'secret.env'), 'TOKEN=1')
+
+    const children: ReturnType<typeof spawn>[] = []
+    const m = new PreviewManager({ run: runProcess, installTimeoutMs: 300_000 })
+    m.setSpawner((argv, cwd2) => {
+      const child = spawn(argv[0]!, argv.slice(1), { cwd: cwd2, env: { ...process.env, FORCE_COLOR: '0' } })
+      children.push(child)
+      return {
+        onOutput: (l) => { child.stdout!.on('data', (d) => l(String(d))); child.stderr!.on('data', (d) => l(String(d))) },
+        done: new Promise((r) => child.on('close', (code, signal) => r({ exitCode: code, signal }))),
+        terminate: () => child.kill('SIGTERM'),
+      }
+    })
+    m.templateWritten('s', v.workspace, v.file)
+    const st = await m.open('s')
+    console.log('preview status', JSON.stringify({ state: st.preview.state, url: st.preview.url, error: st.preview.error }))
+    expect(st.preview.state).toBe('running')
+    const url = st.preview.url!
+    const html = await fetch(url)
+    expect(html.status).toBe(200)
+    const main = await fetch(url + 'main.tsx')
+    expect(main.status).toBe(200)
+    const page = await fetch(url + '@fs' + join(v.workspace, v.file))
+    console.log('page module', page.status)
+    expect(page.status).toBe(200)
+    const secret = await fetch(url + '@fs' + join(v.workspace, 'secret.env'))
+    console.log('secret.env via /@fs', secret.status)
+    expect(secret.status).toBe(403)
+    const pkg = await fetch(url + '@fs' + join(v.workspace, 'package.json'))
+    expect(pkg.status).toBe(403)
+    m.stopAll()
+    await new Promise((r) => setTimeout(r, 300))
+    expect(children.every((c) => c.killed || c.exitCode !== null)).toBe(true)
+  })
+})

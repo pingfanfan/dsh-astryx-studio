@@ -9,6 +9,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import catalog from './generated/catalog.json' with { type: 'json' }
 import type { Runner, RunResult } from './proc.js'
+import { THEMES } from './shared/preview-protocol.js'
 
 export const ASTRYX_VERSION: string = catalog.cliVersion
 
@@ -81,7 +82,8 @@ export function scaffoldFiles(name: string): Record<string, string> {
     scripts: { dev: 'vite', build: 'vite build', typecheck: 'tsc --noEmit' },
     dependencies: {
       '@astryxdesign/core': v,
-      '@astryxdesign/theme-neutral': v,
+      // All seven themes: the preview switches between them without installing anything.
+      ...Object.fromEntries(THEMES.map((t) => [`@astryxdesign/theme-${t}`, v])),
       '@stylexjs/stylex': '^0.19.0',
       react: '^19.2.7',
       'react-dom': '^19.2.7',

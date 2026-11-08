@@ -19,6 +19,8 @@ export interface ToolEnv {
   readonly config: Config
   readonly run: Runner
   readonly tsc: TscScheduler
+  /** astryx_template wrote a page: record it, ask the client to open the preview tab, start Vite. */
+  readonly onTemplate?: (exec: ToolRunContext, workspace: string, page: string) => void
 }
 
 export const TOOL_NAMES = {
@@ -237,6 +239,7 @@ export function createTools(env: ToolEnv): ToolDefinition[] {
       }
       // Warm the incremental tsc cache in the background (first run 15–40 s).
       void env.tsc.schedule(workspace)
+      env.onTemplate?.(exec, workspace, targetPath)
       const value: TemplateValue = {
         template: id,
         file: targetPath,
@@ -322,10 +325,11 @@ export function createTools(env: ToolEnv): ToolDefinition[] {
       const cwd = await env.cwdOf(exec)
       const workspace = cwd ? detectWorkspace(cwd, env.config.appDir) : undefined
       if (!workspace) throw new Error('no Astryx workspace here; create a page with astryx_template first')
-      const file = relative(workspace, resolveInside(workspace, args.file))
-      const out = args.out ? relative(workspace, resolveInside(workspace, args.out)) : undefined
+      // Absolute paths: the CLI resolves `out` against the process cwd, not `cwd`.
+      const file = resolveInside(workspace, args.file)
+      const out = args.out ? resolveInside(workspace, args.out) : undefined
       const api = await env.api()
-      const r = await call('astryx render', () => api.render(file, { cwd: workspace, overwrite: true, ...(out ? { out } : {}) }))
+      const r = await call('astryx render', () => api.render(file, { cwd: workspace, ...(out ? { out } : {}) }))
       return json(r.data)
     },
   })

@@ -168,7 +168,7 @@ describe('astryx_component / astryx_search / astryx_render', () => {
     const ws = tempProject()
     const { get, exec, api } = setup({ cwd: ws })
     await get(TOOL_NAMES.render).execute({ file: 'src/pages/main/page.tsx', out: 'out/page.html' }, exec)
-    expect((api as ReturnType<typeof fakeApi>).calls[0]).toEqual(['render', [join('src', 'pages', 'main', 'page.tsx'), { cwd: ws, overwrite: true, out: join('out', 'page.html') }]])
+    expect((api as ReturnType<typeof fakeApi>).calls[0]).toEqual(['render', [join(ws, 'src', 'pages', 'main', 'page.tsx'), { cwd: ws, out: join(ws, 'out', 'page.html') }]])
     await expect(get(TOOL_NAMES.render).execute({ file: '/etc/passwd' }, exec)).rejects.toThrow(/outside/)
   })
 

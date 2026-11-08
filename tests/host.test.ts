@@ -8,7 +8,7 @@ import { fakeRunner, ok, tempProject, tick } from './helpers.js'
 
 type Handler = (...args: any[]) => Promise<any>
 
-function fakeContext(cwd: string | undefined) {
+function fakeContext(cwd: string | undefined, services: Record<string, unknown> = {}) {
   const tools: { name: string }[] = []
   const sections: { name: string; text: string }[] = []
   const skills: Record<string, unknown>[] = []
@@ -21,6 +21,11 @@ function fakeContext(cwd: string | undefined) {
     systemPrompt: { section: (s: { name: string; text: string }) => (sections.push(s), () => sections.splice(sections.indexOf(s), 1)) },
     skills: { register: (s: Record<string, unknown>) => (skills.push(s), () => skills.splice(skills.indexOf(s), 1)) },
     workingDirectory: { ensure: async () => cwd },
+    ...services,
+    /** cordis ctx.plugin: a sub-plugin applies only when every service it injects exists. */
+    plugin(def: { inject: string[]; apply: (scope: unknown) => void }) {
+      if (def.inject.every((n) => n in services)) def.apply(ctx)
+    },
   }
   return { ctx, tools, sections, skills, handlers, dispose: () => disposers.reverse().forEach((d) => d()) }
 }
@@ -28,8 +33,8 @@ function fakeContext(cwd: string | undefined) {
 const agent = { id: 'agent-1' }
 const PAGE = `import {VStack} from '@astryxdesign/core/Layout';\nexport default function Page() { return <VStack gap={2}>hi</VStack> }\n`
 
-function boot(cwd: string | undefined) {
-  const f = fakeContext(cwd)
+function boot(cwd: string | undefined, services: Record<string, unknown> = {}) {
+  const f = fakeContext(cwd, services)
   const runner = fakeRunner()
   apply(f.ctx as never, {}, { run: runner.run })
   return { ...f, runner }
@@ -66,6 +71,17 @@ describe('host plugin registration', () => {
     const named = [...table.matchAll(/\| [^|]+ \| ([a-z0-9 /-]+) \|/g)].flatMap((m) => m[1]!.split('/').map((s) => s.trim())).filter((s) => s && s !== '模板 id')
     expect(named.length).toBeGreaterThan(20)
     for (const id of named) expect(ids.has(id), id).toBe(true)
+  })
+})
+
+describe('rpc registration', () => {
+  it('registers exact /api/astryx-studio/* Fetch routes through a sub-plugin that injects connection', async () => {
+    const paths: string[] = []
+    const connection = { fetch: { register: (r: { path: string }) => (paths.push(r.path), async () => {}) } }
+    boot(undefined)
+    expect(paths).toEqual([])
+    boot(tempProject(), { connection })
+    expect(paths).toEqual(['/api/astryx-studio/status', '/api/astryx-studio/openPreview', '/api/astryx-studio/reportRuntimeError', '/api/astryx-studio/exportHtml'])
   })
 })
 

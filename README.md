@@ -6,7 +6,7 @@ A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`) pl
 
 > **How this differs from [markmini1234/astryx](https://github.com/markmini1234/astryx):** that project restyles the dsh UI with Astryx. This plugin does the tools, verification and preview for pages you build with Astryx. It does not theme dsh.
 
-**Status: Day 1.** Tools, verify hook, prompt section and skill work. The Vite preview and the template gallery are not built yet (the `astryx-preview` tab is still empty).
+**Status: Day 2.** Tools, verify hook, prompt section, skill and the live preview tab work. The template gallery is not built yet.
 
 ## What it does
 
@@ -25,7 +25,16 @@ A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`) pl
 
 **Prompt and skill.** A stable prompt section (the playbook rules from `build()` plus the Chinese workflow), and an `astryx-page` skill with a template selection table and the full template list.
 
-`@astryxdesign/cli`, `core`, `build` and the scaffold are pinned to the same version (0.7.11).
+**Preview tab.** `astryx_template` opens the **Astryx 预览** tab in the right Sidebar:
+
+- **The iframe** points straight at a preview Vite on `127.0.0.1`, started lazily through `ctx.subprocess`, restarted once on a crash and killed with the plugin. The harness lives in `<workspace>/.astryx-studio/` (git-ignored). The user's own `vite.config` is untouched. `server.fs.allow` covers only `.astryx-studio/`, `src/` and `node_modules/`.
+- **The toolbar** switches between the 7 themes, dark mode and three widths (desktop / tablet / 390) without the model and without recompiling; the choice survives a refresh. It can also open the page in the browser or export single-file HTML.
+- **The footer** shows the Vite state and the latest verify result.
+- **Runtime errors** in the page show in the tab. They reach the model at its next step only if they happened after its last write, and each distinct error only once.
+
+Screenshots: [docs/preview-day2.md](docs/preview-day2.md).
+
+`@astryxdesign/cli`, `core`, `build`, the 7 themes and the scaffold are pinned to the same version (0.7.11).
 
 ## Install (development)
 
@@ -40,7 +49,7 @@ dsh plugin --profile dev add .
 dsh --profile dev --no-open
 ```
 
-Expected: the five `astryx_*` tools in the tool list; "Astryx 预览" under the right Sidebar's guide page.
+Expected: the five `astryx_*` tools in the tool list. Ask for a page and the **Astryx 预览** tab opens with the live preview.
 
 ## Layout
 
@@ -50,6 +59,9 @@ Expected: the five `astryx_*` tools in the tool list; "Astryx 预览" under the 
 | `src/tools.ts`, `src/astryx.ts` | The five tools over `@astryxdesign/cli/api` |
 | `src/workspace.ts` | Workspace detection and the built-in Vite scaffold |
 | `src/verify/` | esbuild syntax, lint count-diff, tsc scheduler, hook core |
+| `src/preview/` | `.astryx-studio/` harness, Vite server lifecycle, per-session preview state and runtime-error gating |
+| `src/rpc.ts`, `src/shared/` | Client ↔ Host RPC (exact routes under `/api/astryx-studio/`) and the shared protocol |
+| `client/preview-tab.tsx`, `client/store.ts` | Preview tab body, toolbar, footer, persisted toolbar state |
 | `src/prompt.ts`, `src/generated/catalog.json` | Prompt section and skill; catalog generated from the pinned CLI at build time |
 | `client/index.tsx` | Web client half: `astryx-preview` tab type and body |
 | `scripts/build.mjs` | tsdown build to `lib/index.js` (ESM) and `lib/client.js` (a ModuleLoader factory) |

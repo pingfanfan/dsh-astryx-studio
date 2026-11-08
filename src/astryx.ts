@@ -23,7 +23,8 @@ export interface AstryxApi {
     query: string,
     options: { cwd: string; type?: SearchDomain; limit?: number },
   ): Promise<CliResponse>
-  render(file: string, options: { cwd: string; out?: string; overwrite?: boolean }): Promise<CliResponse>
+  /** `overwrite` is not accepted here: render replaces a file it rendered before, and rejects --overwrite outside --reverse. */
+  render(file: string, options: { cwd: string; out?: string }): Promise<CliResponse>
 }
 
 export type SearchDomain = 'component' | 'hook' | 'doc' | 'template' | 'theme'
