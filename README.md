@@ -14,8 +14,11 @@ Requires dsh `>=0.2.2-rc.1 <0.3.0`.
 
 ```sh
 pnpm install && pnpm run build
+# once: make `dev` a copy of the shipped web profile (a profile created by
+# `plugin add` alone only has dsh-base and cannot serve the web UI)
+dsh --profile dev --from-default-profile web --dump-config > /dev/null
 dsh plugin --profile dev add .
-dsh --profile dev web
+dsh --profile dev --no-open
 ```
 
 Expected: `astryx_ping` in the tool list; "Astryx 预览" under the right Sidebar's guide page.

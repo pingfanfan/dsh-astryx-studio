@@ -14,8 +14,11 @@
 
 ```sh
 pnpm install && pnpm run build
+# 只需一次：把 dev 建成官方 web 模板的副本（单靠 `plugin add` 自动建的
+# profile 只有 dsh-base，起不了 Web UI）
+dsh --profile dev --from-default-profile web --dump-config > /dev/null
 dsh plugin --profile dev add .
-dsh --profile dev web
+dsh --profile dev --no-open
 ```
 
 预期：工具列表里出现 `astryx_ping`；右侧 Sidebar 的引导页里出现「Astryx 预览」。
