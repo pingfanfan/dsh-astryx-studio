@@ -1,0 +1,12 @@
+{
+  "meta": {
+    "title": "Astryx Studio",
+    "description": "Build pages with Meta's Astryx design system: structured Astryx tools, a verify hook, and a live preview tab."
+  },
+  "tab": {
+    "preview": {
+      "title": "Astryx Preview",
+      "description": "Live preview of the Astryx page being built."
+    }
+  }
+}

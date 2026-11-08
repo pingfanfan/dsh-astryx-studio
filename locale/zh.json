@@ -1,0 +1,12 @@
+{
+  "meta": {
+    "title": "Astryx Studio",
+    "description": "用 Meta 的 Astryx 设计系统构建页面：结构化 Astryx 工具、写入验证钩子和实时预览 tab。"
+  },
+  "tab": {
+    "preview": {
+      "title": "Astryx 预览",
+      "description": "正在构建的 Astryx 页面的实时预览。"
+    }
+  }
+}

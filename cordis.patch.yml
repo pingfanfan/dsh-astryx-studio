@@ -1,0 +1,11 @@
+# Bundle patch applied when a profile lists dsh-astryx-studio in
+# `dsh.profile.bundles`. The package name must match package.json.
+#
+# To disable the plugin for one profile, add an id-targeted override to that
+# profile's own cordis.patch.yml (profile layers apply after bundle layers):
+#
+#   - id: astryx-studio
+#     disabled: true
+- insert:
+    - id: astryx-studio
+      name: dsh-astryx-studio

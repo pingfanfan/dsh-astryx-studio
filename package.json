@@ -1,0 +1,85 @@
+{
+  "name": "dsh-astryx-studio",
+  "version": "0.0.0",
+  "description": "Build pages with Meta's Astryx design system inside DeepSeek Harness: structured Astryx tools, a verify hook, and a live preview tab.",
+  "type": "module",
+  "main": "./lib/index.js",
+  "types": "./lib/index.d.ts",
+  "icon": "./icon.svg",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": "./lib/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md",
+    "README.zh.md",
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "author": "pingfanfan",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pingfanfan/dsh-astryx-studio.git"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "astryx",
+    "design-system",
+    "page-builder"
+  ],
+  "engines": {
+    "node": ">=22",
+    "dsh": ">=0.2.2-rc.1 <0.3.0"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "check": "pnpm run typecheck && pnpm run build && pnpm run test"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.1.0",
+    "@deepseek-ai/dsh-client-ui-sidebar-right": ">=0.2.2-rc.1 <0.3.0",
+    "@deepseek-ai/dsh-skill": ">=0.2.2-rc.1 <0.3.0",
+    "@deepseek-ai/dsh-tools": ">=0.2.2-rc.1 <0.3.0"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.1.0",
+    "@deepseek-ai/dsh-client-ui-sidebar-right": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-client-ui-slots": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-skill": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-system-prompt": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-tools": "0.2.2-rc.1",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "react": "^19.3.1",
+    "tsdown": "^0.23.7",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-sidebar-right"
+      ]
+    }
+  }
+}
