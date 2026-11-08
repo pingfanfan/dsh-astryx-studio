@@ -3,7 +3,10 @@
     "target": "ES2023",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "lib": ["ES2023", "DOM"],
+    "lib": [
+      "ES2023",
+      "DOM"
+    ],
     "jsx": "react-jsx",
     "strict": true,
     "noUncheckedIndexedAccess": true,
@@ -11,8 +14,16 @@
     "verbatimModuleSyntax": false,
     "isolatedModules": true,
     "skipLibCheck": true,
-    "types": ["node"],
-    "noEmit": true
+    "types": [
+      "node"
+    ],
+    "noEmit": true,
+    "resolveJsonModule": true
   },
-  "include": ["src", "client", "tests", "scripts/*.ts"]
+  "include": [
+    "src",
+    "client",
+    "tests",
+    "scripts/*.ts"
+  ]
 }

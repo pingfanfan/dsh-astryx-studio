@@ -15,7 +15,7 @@ const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 const lib = join(root, 'lib')
 rmSync(lib, { recursive: true, force: true })
 
-const external = [/^@deepseek-ai\//, /^react($|\/)/, /^react-dom($|\/)/]
+const external = [/^@deepseek-ai\//, /^@astryxdesign\//, /^esbuild$/, /^react($|\/)/, /^react-dom($|\/)/]
 
 await build({
   cwd: root,
