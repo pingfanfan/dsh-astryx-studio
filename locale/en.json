@@ -1,12 +1,17 @@
 {
   "meta": {
     "title": "Astryx Studio",
-    "description": "Build pages with Meta's Astryx design system: structured Astryx tools, a verify hook, and a live preview tab."
+    "description": "Build pages with Meta's Astryx design system: the agent picks a page template, adapts it, and every write is checked for syntax, lint and types, with a live preview tab and a template gallery in the right sidebar.",
+    "detail": "docs/DETAIL.md"
   },
   "tab": {
     "preview": {
-      "title": "Astryx Preview",
+      "title": "Astryx preview",
       "description": "Live preview of the Astryx page being built."
+    },
+    "gallery": {
+      "title": "Astryx template gallery",
+      "description": "Page templates; click one to start from it."
     }
   }
 }

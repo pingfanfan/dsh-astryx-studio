@@ -222,3 +222,37 @@ export async function scaffold(
   })
   return { dir, packageManager: pm, install }
 }
+
+/**
+ * What to install after a template write. The CLI's `missingPackages` /
+ * `installCommand` are not trusted as-is: in 0.7.11 they also list words from
+ * code samples inside template strings (`pnpm add Next`, `canvas-editor`,
+ * `Distribution`). The plan installs only packages the written file really
+ * imports (parsed by esbuild) that the workspace lacks, keeping the CLI's
+ * version range when it gave one. Returned specs go straight to argv, never
+ * through a shell.
+ */
+export async function planInstall(
+  workspace: string,
+  source: string,
+  cliInstallCommand: string | undefined,
+  file = 'page.tsx',
+): Promise<{ specs: string[]; ignored: string[] }> {
+  const { importSpecifiers, packageRoot } = await import('./verify/lint.js')
+  const imported = new Set((await importSpecifiers(source, file)).map(packageRoot))
+  const ranges = new Map<string, string>()
+  const cliNames: string[] = []
+  for (const token of (cliInstallCommand ?? '').split(/\s+/).slice(2)) {
+    const m = /^(@?[^@\s"]+)(?:@"?([^"\s]+)"?)?$/.exec(token)
+    if (!m) continue
+    cliNames.push(m[1]!)
+    if (m[2]) ranges.set(m[1]!, m[2])
+  }
+  const specs: string[] = []
+  for (const root of imported) {
+    if (existsSync(join(workspace, 'node_modules', root, 'package.json'))) continue
+    if (!/^(@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*$/.test(root)) continue
+    specs.push(ranges.has(root) ? `${root}@${ranges.get(root)}` : root)
+  }
+  return { specs, ignored: cliNames.filter((n) => !imported.has(n)) }
+}

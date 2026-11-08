@@ -2,7 +2,7 @@ import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { apply, inject, MESSAGE_SOURCE } from '../src/index.js'
-import { PROMPT_SECTION_NAME, PROMPT_TEXT, SKILL_CONTENT, SKILL_NAME } from '../src/prompt.js'
+import { LONG_TEMPLATES, PROMPT_SECTION_NAME, PROMPT_TEXT, REQUEST_TABLE, SKILL_CONTENT, SKILL_NAME, STYLEX_TEMPLATES } from '../src/prompt.js'
 import catalog from '../src/generated/catalog.json' with { type: 'json' }
 import { fakeRunner, ok, tempProject, tick } from './helpers.js'
 
@@ -65,12 +65,16 @@ describe('host plugin registration', () => {
     expect(PROMPT_TEXT).toContain('预览工具条')
   })
 
-  it('every template id named in the skill table exists', () => {
+  it('every template id the skill names exists; the skill covers copy length, stylex and long templates', () => {
     const ids = new Set(catalog.templates.map((t) => t.id))
-    const table = SKILL_CONTENT.split('## 全部页面模板')[0]!
-    const named = [...table.matchAll(/\| [^|]+ \| ([a-z0-9 /-]+) \|/g)].flatMap((m) => m[1]!.split('/').map((s) => s.trim())).filter((s) => s && s !== '模板 id')
-    expect(named.length).toBeGreaterThan(20)
+    const named = REQUEST_TABLE.flatMap(([, v]) => v.match(/[a-z0-9]+(?:-[a-z0-9]+)*/g) ?? []).filter((w) => w.length > 2)
+    expect(named.length).toBeGreaterThan(15)
     for (const id of named) expect(ids.has(id), id).toBe(true)
+    for (const id of [...STYLEX_TEMPLATES, ...LONG_TEMPLATES.map(([id]) => id)]) expect(ids.has(id), id).toBe(true)
+    expect(STYLEX_TEMPLATES).toHaveLength(15)
+    expect(SKILL_CONTENT).toContain('中文文案长度')
+    expect(SKILL_CONTENT).toContain('canvas-editor（2876 行）')
+    expect(SKILL_CONTENT).toContain('StyleX 模板')
   })
 })
 
@@ -81,7 +85,7 @@ describe('rpc registration', () => {
     boot(undefined)
     expect(paths).toEqual([])
     boot(tempProject(), { connection })
-    expect(paths).toEqual(['/api/astryx-studio/status', '/api/astryx-studio/openPreview', '/api/astryx-studio/reportRuntimeError', '/api/astryx-studio/exportHtml'])
+    expect(paths).toEqual(['status', 'openPreview', 'reportRuntimeError', 'exportHtml', 'gallery', 'startTemplate', 'getPrefs', 'setPrefs', 'thumb'].map((e) => `/api/astryx-studio/${e}`))
   })
 })
 

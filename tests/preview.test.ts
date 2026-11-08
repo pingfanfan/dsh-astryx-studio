@@ -61,7 +61,7 @@ describe('preview harness scaffold', () => {
       expect(main).toContain(`import '@astryxdesign/theme-${t}/theme.css';`)
       expect(main).toContain(`import {${t}Theme} from '@astryxdesign/theme-${t}/built';`)
     }
-    for (const s of ["q.get('page')", "q.get('theme')", "q.get('dark')", 'import.meta.glob', "import.meta.hot.on('vite:error'", "addEventListener('error'", "addEventListener('unhandledrejection'", 'componentDidCatch', 'postMessage', '<Theme theme={THEMES[params.theme]}']) {
+    for (const s of ["q.get('page')", "q.get('theme')", "q.get('dark')", 'import.meta.glob', "import.meta.hot.on('vite:error'", "addEventListener('error'", "addEventListener('unhandledrejection'", 'componentDidCatch', 'postMessage', "import.meta.hot.on('vite:afterUpdate'", '<Theme theme={THEMES[params.theme]}']) {
       expect(main).toContain(s)
     }
     expect(main).not.toContain('astryx.css')

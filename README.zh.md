@@ -6,7 +6,7 @@
 
 > **和 [markmini1234/astryx](https://github.com/markmini1234/astryx) 的区别：** 那个项目用 Astryx 给 dsh 界面换主题；本插件为你用 Astryx 构建的页面提供工具、验证和预览，不改 dsh 的主题。
 
-**状态：Day 2。** 工具、验证钩子、prompt section、skill 和实时预览 tab 都已可用。模板画廊还没做。
+**状态：Day 3。** 工具、验证钩子、prompt section、skill、实时预览 tab 和模板画廊都已可用。尚未发布，bench 延后。
 
 ## 功能
 
@@ -32,7 +32,9 @@
 - **页脚**显示 Vite 状态和最近一次 verify 结果。
 - **页面运行时错误**会显示在 tab 里。只有发生在模型最后一次写入之后的错误，才会在模型下一步注入，同一个错误只注入一次。
 
-截图见 [docs/preview-day2.md](docs/preview-day2.md)。
+**模板画廊。** 「Astryx 模板画廊」tab（也可以从预览工具条打开）展示全部 57 个页面模板，带缩略图、分类筛选和搜索。点一张卡片，会以普通用户消息的形式发送「用 `<id>` 模板开始」：放在哪、怎么写仍由模型决定并调用 `astryx_template`。工具条的选择（主题、暗色、宽度）同时保存在 `$DSH_HOME/astryx-studio/prefs.json`，DSH 换端口重启后也能恢复。
+
+截图见 [docs/preview-day2.md](docs/preview-day2.md)、[docs/gallery-day3.md](docs/gallery-day3.md)。
 
 `@astryxdesign/cli`、`core`、`build`、7 套主题和脚手架锁在同一版本（0.7.11）。
 
@@ -69,6 +71,12 @@ dsh --profile dev --no-open
 | `tests/` | 每个工具和钩子的单测、57 个模板的 lint 校准、client 冒烟测试；`ASTRYX_E2E=1` 跑真实的脚手架 → 模板 → tsc 集成测试 |
 
 `lib/` 随仓库提交，本地 checkout 和 git 安装都不用再跑构建。
+
+## 发布前生成的资源
+
+- `pnpm exec tsx scripts/gen-thumbs.ts`：用 Playwright 重新生成 `assets/thumbs/*.png`（57 张 480×300，约 1 MiB）。
+- `node scripts/gen-preview-svg.mjs`：重新生成 `docs/preview.svg` 和 `docs/preview.zh.svg`（Plugin Manager 详情页配图，文字用 Noto Sans CJK SC 转成路径）。
+- `node scripts/gen-catalog.mjs`（`pnpm run build` 会自动运行）：从锁定版本的 CLI 生成 playbook 规则和模板目录。
 
 ## 脚本
 

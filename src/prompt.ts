@@ -29,46 +29,72 @@ export const PROMPT_TEXT = [
   `需要模板选型表或 StyleX 模板的注意事项时，加载 \`${SKILL_NAME}\` skill。`,
 ].join('\n')
 
-const STYLEX_NOTE =
-  '有 15 个模板用 `stylex.create`。可以修改已有 stylex 对象里的值，但值必须是静态可分析的字面量（不能来自 props 或变量计算），也不要新增 `stylex.create` 调用：验证钩子会把新增计为违规。'
+/** The 15 page templates that call stylex.create (lint calibration, cli 0.7.11). */
+export const STYLEX_TEMPLATES = [
+  'canvas-editor', 'table-collapsible', 'table-comparison', 'dashboard-comparison', 'dashboard-scorecard',
+  'table-filter', 'dashboard-cohort-funnel', 'table-inbox', 'kanban-board', 'dashboard-progress',
+  'dashboard-alert-rail', 'settings-dialog', 'shell-top-nav', 'table-tree', 'work-item-detail',
+] as const
+
+/** Templates long enough that reading them whole costs tens of thousands of tokens. */
+export const LONG_TEMPLATES = [
+  ['table-filter', 4632],
+  ['canvas-editor', 2876],
+  ['table-inbox', 2705],
+  ['settings-dialog', 2604],
+  ['table-tree', 1705],
+  ['dashboard-alert-rail', 1591],
+] as const
+
+/** Common Chinese requests → the template to start from. */
+export const REQUEST_TABLE: readonly (readonly [string, string])[] = [
+  ['数据看板 / 运营后台首页 / 销售看板', 'dashboard'],
+  ['KPI 记分卡 / 指标达成', 'dashboard-scorecard'],
+  ['转化漏斗 / 留存分析', 'dashboard-cohort-funnel'],
+  ['服务监控 / 告警大盘', 'dashboard-alert-rail'],
+  ['登录页', 'login（带品牌插图用 login-split，企业 SSO 用 login-sso）'],
+  ['产品落地页 / 首页 Hero', 'centered-hero'],
+  ['数据表格 / 列表管理', 'table-page（要筛选用 table-filter）'],
+  ['收件箱 / 工单列表', 'table-inbox'],
+  ['设置页', 'settings（侧边导航用 settings-sidebar）'],
+  ['多步表单 / 注册向导', 'form-wizard'],
+  ['支付 / 结算', 'payment-form 或 checkout-wizard'],
+  ['帮助文档 / API 文档', 'documentation-technical'],
+  ['AI 对话 / 聊天', 'ai-chat（空状态首页用 ai-chat-landing）'],
+  ['任务看板（Kanban）', 'kanban-board'],
+  ['商品详情', 'product-detail'],
+  ['什么都不像', 'blank'],
+]
 
 export const SKILL_CONTENT = [
   '# astryx-page：用 Astryx 模板构建页面',
   '',
   '## 选模板',
   '',
-  '先用 `astryx_build` 的英文关键词让 ranker 选；`basis` 为 `direct` 最可靠，`closest` 时看一眼备选，`fallback` 时从下表直接挑。',
+  '先用 `astryx_build` 的英文关键词让 ranker 选。`basis` 为 `direct` 最可靠；`closest` 时看一眼备选；`fallback` 时从下表或全部模板清单里自己挑。用户在模板画廊里点过的模板，直接用那个 id。',
   '',
-  '| 需求 | 模板 id |',
+  '| 常见中文需求 | 起始模板 |',
   '|---|---|',
-  '| 数据看板、运营后台首页 | dashboard / dashboard-scorecard / dashboard-cohort-funnel / dashboard-alert-rail |',
-  '| 登录、注册 | login / login-card / login-split / login-sso |',
-  '| 定价、落地页、营销 | centered-hero / gallery-hero |',
-  '| 表格、列表、收件箱 | table / table-page / table-filter / table-inbox / table-grouped |',
-  '| 设置页 | settings / settings-sidebar / settings-dialog |',
-  '| 表单、多步向导 | form-two-column / form-wizard / form-wizard-vertical / contact-form |',
-  '| 文档 | documentation / documentation-technical |',
-  '| 聊天、AI 对话 | ai-chat / ai-chat-landing / messaging-shell |',
-  '| 看板（Kanban） | kanban-board |',
-  '| 详情页 | detail-page / product-detail / work-item-detail |',
-  '| 什么都不像 | blank |',
+  ...REQUEST_TABLE.map(([req, id]) => `| ${req} | ${id} |`),
   '',
   '## 全部页面模板',
   '',
-  ...catalog.templates.map((t) => `- \`${t.id}\` ${t.name}: ${t.description}`),
+  ...catalog.templates.map((t) => `- \`${t.id}\`（${t.category}）${t.name}: ${t.description}`),
   '',
   '## 改模板',
   '',
   '- 保留模板的页面框架、gap 和 padding；替换数据、文案和区块。',
-  '- 只读需要改的那一段：大模板（canvas-editor、ide）上千行，先用 read 的行范围定位，再 edit。',
+  '- **中文文案长度**：同样意思的中文通常比英文模板文案长 30–50%。卡片标题、按钮、表头、徽章换成中文后，检查是否折行或撑破；优先用更短的说法，不要靠缩小字号或加 `style={{}}`。',
+  `- **超长模板只读相关段落**：${LONG_TEMPLATES.map(([id, n]) => `${id}（${n} 行）`).join('、')} 读全文要几万 token。先 \`read\` 前 80 行看结构和 import，再用行范围只读要改的那一段，用 \`edit\` 精确替换，不要整文件 \`write\`。`,
+  `- **StyleX 模板**（15 个：${STYLEX_TEMPLATES.join('、')}）：可以改已有 \`stylex.create\` 对象里的值，但值必须是静态字面量（不能来自 props、变量或运算），也不要新增 \`stylex.create\` 调用，验证钩子会把新增计为违规。`,
   '- 加区块用已有组件，布局用 VStack/HStack/Grid/Card，不加 `<div>` 和 `style={{}}`。',
-  `- ${STYLEX_NOTE}`,
   '- import 只能来自 @astryxdesign/*、@stylexjs/stylex、react、@heroicons/react、lucide-react、recharts。',
   '',
   '## 验证',
   '',
   '- 每次文件工具写入 `.ts/.tsx` 后，同步检查语法和 lint（`<div>` / `style={{}}` / `stylex.create` 数量不得增加、import 白名单），失败时立刻收到 `astryx verify ✗`。',
   '- tsc 在后台跑，结果在下一步开头注入。看到 `TS2322` 一类 prop 错误时，先 `astryx_component` 查 props 再改。',
+  '- 预览里的运行时错误（渲染报错、未捕获异常）也会在下一步注入，修复方式相同。',
 ].join('\n')
 
 export const SKILL_REGISTRATION = {

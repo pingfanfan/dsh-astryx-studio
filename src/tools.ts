@@ -9,7 +9,8 @@ import { describeError, PLUGIN_ROOT, SEARCH_DOMAINS, type AstryxApi, type Search
 import type { Config } from './config.js'
 import catalog from './generated/catalog.json' with { type: 'json' }
 import type { Runner } from './proc.js'
-import { detectWorkspace, isPlaceholder, resolveInside, scaffold } from './workspace.js'
+import { detectWorkspace, isPlaceholder, pickPackageManager, planInstall, resolveInside, scaffold } from './workspace.js'
+import { readFileSync } from 'node:fs'
 import type { TscScheduler } from './verify/tsc.js'
 
 export interface ToolEnv {
@@ -225,17 +226,20 @@ export function createTools(env: ToolEnv): ToolDefinition[] {
       const r = await call('astryx template', () => api.template(id, { cwd: ws, targetPath, overwrite }))
       const data = (r.data ?? {}) as { missingPackages?: string[]; installCommand?: string; notes?: string[] }
       const installed: string[] = []
-      if (data.missingPackages?.length && data.installCommand) {
-        const ir = await env.run(data.installCommand, [], {
-          cwd: workspace,
-          shell: true,
-          signal: exec.signal,
-          timeoutMs: env.config.installTimeoutMs,
-        })
-        if (ir.code !== 0) {
-          throw new Error(`template written, but "${data.installCommand}" failed:\n${(ir.stderr || ir.stdout).slice(-1500)}`)
+      if (data.missingPackages?.length) {
+        const plan = await planInstall(workspace, readFileSync(target, 'utf8'), data.installCommand, target)
+        if (plan.specs.length > 0) {
+          const pm = await pickPackageManager(env.config.packageManager, env.run, workspace)
+          const ir = await env.run(pm, [pm === 'npm' ? 'install' : 'add', ...plan.specs], {
+            cwd: workspace,
+            signal: exec.signal,
+            timeoutMs: env.config.installTimeoutMs,
+          })
+          if (ir.code !== 0) {
+            throw new Error(`template written, but "${pm} add ${plan.specs.join(' ')}" failed:\n${(ir.stderr || ir.stdout).slice(-1500)}`)
+          }
+          installed.push(...plan.specs)
         }
-        installed.push(...data.missingPackages)
       }
       // Warm the incremental tsc cache in the background (first run 15–40 s).
       void env.tsc.schedule(workspace)

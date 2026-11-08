@@ -10,7 +10,7 @@ import { THEMES } from '../shared/preview-protocol.js'
 
 export const PREVIEW_DIR = '.astryx-studio'
 /** Bumped when the generated files change, so old harnesses are rewritten. */
-export const HARNESS_VERSION = 2
+export const HARNESS_VERSION = 3
 
 export function themePackage(theme: string): string {
   return `@astryxdesign/theme-${theme}`
@@ -74,6 +74,8 @@ if (import.meta.hot) {
   import.meta.hot.on('vite:error', (payload: {err: {message: string; stack?: string}}) =>
     post({type: 'error', kind: 'vite', message: payload.err.message, stack: payload.err.stack}),
   );
+  // After an HMR update the tab clears its error bar; an error that survives is re-posted by the render.
+  import.meta.hot.on('vite:afterUpdate', () => post({type: 'updated'}));
 }
 
 class Boundary extends Component<{children: ReactNode; resetKey: string}, {error?: Error}> {

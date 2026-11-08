@@ -13,6 +13,8 @@ export interface Config {
   tscStepWaitMs: number
   /** Maximum tsc / lint findings quoted back to the model per injection. */
   maxReportedErrors: number
+  /** Preview toolbar prefs file; empty means $DSH_HOME/astryx-studio/prefs.json. */
+  prefsFile: string
 }
 
 export const Config: Schema<Config> = Schema.object({
@@ -22,6 +24,7 @@ export const Config: Schema<Config> = Schema.object({
   tscTimeoutMs: Schema.natural().default(30_000).description('tsc --noEmit timeout (ms).'),
   tscStepWaitMs: Schema.natural().default(5_000).description('Max wait (ms) at the next agent step for an in-flight tsc run.'),
   maxReportedErrors: Schema.natural().default(5).description('Max findings quoted per verify message.'),
+  prefsFile: Schema.string().default('').description('Preview toolbar prefs file (default: $DSH_HOME/astryx-studio/prefs.json).'),
 }) as Schema<Config>
 
 export const DEFAULT_CONFIG: Config = {
@@ -31,4 +34,5 @@ export const DEFAULT_CONFIG: Config = {
   tscTimeoutMs: 30_000,
   tscStepWaitMs: 5_000,
   maxReportedErrors: 5,
+  prefsFile: '',
 }

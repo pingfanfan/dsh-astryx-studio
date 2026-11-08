@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import type { ToolDefinition, ToolRunContext } from '@deepseek-ai/dsh-tools'
 import { PLUGIN_ROOT, type AstryxApi, type CliResponse } from '../src/astryx.js'
@@ -75,20 +75,34 @@ describe('astryx_build', () => {
 })
 
 describe('astryx_template', () => {
-  it('writes into an existing workspace, runs installCommand for missing packages, warms tsc', async () => {
-    const ws = tempProject()
+  it('installs only packages the written file really imports (no shell), keeping the CLI version range; warms tsc', async () => {
+    const ws = tempProject({ 'node_modules/@heroicons/react/package.json': '{}' })
+    const page = [
+      "import {LineChart} from 'recharts';",
+      "import {Bars3Icon} from '@heroicons/react/24/outline';",
+      // A code sample inside a string: the CLI 0.7.11 reports these words as missing packages.
+      "const sample = `import Next from 'Next'; await import('canvas-editor')`;",
+      'export default () => null',
+    ].join('\n')
     const api = fakeApi({
-      template: vi.fn(async () => ({ type: 'template.copy', data: { missingPackages: ['recharts'], installCommand: 'pnpm add recharts@"^3.9.2"', notes: ['Install missing dependencies: pnpm add recharts'] } })),
+      template: vi.fn(async (_id: string, o: { cwd: string; targetPath: string }) => {
+        mkdirSync(dirname(join(o.cwd, o.targetPath)), { recursive: true })
+        writeFileSync(join(o.cwd, o.targetPath), page)
+        return { type: 'template.copy', data: { missingPackages: ['recharts', 'Next', 'canvas-editor'], installCommand: 'pnpm add recharts@"^3.9.2" Next canvas-editor', notes: ['Install missing dependencies: pnpm add recharts'] } }
+      }),
     })
     const { get, exec, runner } = setup({ cwd: ws, api })
     const p = get(TOOL_NAMES.template).execute({ id: 'dashboard' }, exec)
-    await tick(); await tick()
-    expect(runner.calls[0]).toMatchObject({ command: 'pnpm add recharts@"^3.9.2"', shell: true, cwd: ws })
+    await vi.waitFor(() => expect(runner.calls.length).toBe(1))
+    expect(runner.calls[0]).toMatchObject({ command: 'pnpm', args: ['--version'] })
     runner.calls[0]!.resolve(ok())
+    await vi.waitFor(() => expect(runner.calls.length).toBe(2))
+    expect(runner.calls[1]).toMatchObject({ command: 'pnpm', args: ['add', 'recharts@^3.9.2'], shell: false, cwd: ws })
+    runner.calls[1]!.resolve(ok())
     const v = (await p) as Record<string, unknown>
     expect(api.template).toHaveBeenCalledWith('dashboard', { cwd: ws, targetPath: join('src', 'pages', 'main', 'page.tsx'), overwrite: false })
-    expect(v).toMatchObject({ template: 'dashboard', workspace: ws, scaffolded: false, installed: ['recharts'], notes: [] })
-    expect(runner.calls[1]!.args).toContain('--incremental')
+    expect(v).toMatchObject({ template: 'dashboard', workspace: ws, scaffolded: false, installed: ['recharts@^3.9.2'], notes: [] })
+    expect(runner.calls[2]!.args).toContain('--incremental')
   })
 
   it('replaces the untouched scaffold placeholder without overwrite, but not a page the user changed', async () => {

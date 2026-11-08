@@ -12,7 +12,7 @@
  */
 export const RPC_CHANNEL = '/api'
 export const RPC_PREFIX = 'astryx-studio'
-export const RPC_ENDPOINTS = ['status', 'openPreview', 'reportRuntimeError', 'exportHtml'] as const
+export const RPC_ENDPOINTS = ['status', 'openPreview', 'reportRuntimeError', 'exportHtml', 'gallery', 'startTemplate', 'getPrefs', 'setPrefs'] as const
 
 export const THEMES = ['neutral', 'stone', 'matcha', 'y2k', 'gothic', 'chocolate', 'butter'] as const
 export type ThemeName = (typeof THEMES)[number]
@@ -24,6 +24,7 @@ export type WidthName = keyof typeof WIDTHS
 export const PREVIEW_MESSAGE_SOURCE = 'astryx-studio-preview'
 export type PreviewMessage =
   | { source: typeof PREVIEW_MESSAGE_SOURCE; type: 'ready'; page: string }
+  | { source: typeof PREVIEW_MESSAGE_SOURCE; type: 'updated' }
   | { source: typeof PREVIEW_MESSAGE_SOURCE; type: 'error'; kind: 'render' | 'window' | 'promise' | 'vite'; message: string; stack?: string }
 
 /** Messages the tab posts into the preview page (no reload, no recompile). */

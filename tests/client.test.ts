@@ -53,13 +53,22 @@ describe('client bundle', () => {
       connection: { rpc: { call: async (_c: string, endpoint: string) => ({ ok: true, value: { openSeq, preview: { state: 'idle', log: [] }, verify: { state: 'none', summary: '', at: 0 } } }) } },
     }
     ;(mod.apply as (c: typeof ctx) => void)(ctx)
-    expect(tabs).toHaveLength(1)
-    expect(tabs[0]).toMatchObject({ id: 'dsh-astryx-studio/preview', kind: 'astryx-preview', keepMounted: true })
+    expect(tabs.map((t) => [t.id, t.kind])).toEqual([
+      ['dsh-astryx-studio/preview', 'astryx-preview'],
+      ['dsh-astryx-studio/gallery', 'astryx-gallery'],
+    ])
+    expect(tabs[0]).toMatchObject({ keepMounted: true })
     expect(tabs[0]!.title('')).toBe('Astryx 预览')
-    expect(bodies[0]).toMatchObject({ name: 'sidebar.right.pane.tab', key: 'dsh-astryx-studio/preview' })
-    const face = bodies[0]!.inject('session-1').astryx
+    expect(tabs[1]!.title('')).toBe('Astryx 模板画廊')
+    expect(bodies.map((b) => b.key).sort()).toEqual(['dsh-astryx-studio/gallery', 'dsh-astryx-studio/preview'])
+    const body = (key: string) => bodies.find((b) => b.key === key)!
+    const face = body('dsh-astryx-studio/preview').inject('session-1').astryx
     expect(face.sessionId).toBe('session-1')
     expect((face.hasWebReview as () => boolean)()).toBe(false)
+    ;(face.openGallery as () => void)()
+    expect(opened).toEqual([['session-1', 'astryx-gallery']])
+    opened.length = 0
+    expect(body('dsh-astryx-studio/gallery').inject('session-1').astryx.sessionId).toBe('session-1')
 
     // astryx_template bumps openSeq → the watcher opens the tab once.
     openSeq = 1

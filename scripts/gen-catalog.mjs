@@ -23,7 +23,7 @@ const catalog = {
   rules: help.data.rules,
   templates: list.data
     .filter((t) => t.type === 'page')
-    .map((t) => ({ id: t.id, name: t.name, description: firstSentence(t.description) })),
+    .map((t) => ({ id: t.id, name: t.name, category: String(t.category ?? '').split(' - ')[0] || 'Other', description: firstSentence(t.description) })),
 }
 writeFileSync(join(root, 'src/generated/catalog.json'), JSON.stringify(catalog, null, 2) + '\n')
 console.log(`catalog: cli ${catalog.cliVersion}, ${catalog.rules.length} rules, ${catalog.templates.length} page templates`)

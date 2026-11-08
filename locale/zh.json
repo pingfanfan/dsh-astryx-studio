@@ -1,12 +1,17 @@
 {
   "meta": {
     "title": "Astryx Studio",
-    "description": "用 Meta 的 Astryx 设计系统构建页面：结构化 Astryx 工具、写入验证钩子和实时预览 tab。"
+    "description": "用 Meta 的 Astryx 设计系统构建页面：agent 先选页面模板再修改，每次写入都检查语法、lint 和类型；右侧 Sidebar 提供实时预览和模板画廊。",
+    "detail": "docs/DETAIL.zh.md"
   },
   "tab": {
     "preview": {
       "title": "Astryx 预览",
       "description": "正在构建的 Astryx 页面的实时预览。"
+    },
+    "gallery": {
+      "title": "Astryx 模板画廊",
+      "description": "页面模板，点一下让模型从它开始。"
     }
   }
 }

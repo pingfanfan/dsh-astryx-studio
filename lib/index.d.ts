@@ -64,6 +64,8 @@ export interface Config {
   tscStepWaitMs: number;
   /** Maximum tsc / lint findings quoted back to the model per injection. */
   maxReportedErrors: number;
+  /** Preview toolbar prefs file; empty means $DSH_HOME/astryx-studio/prefs.json. */
+  prefsFile: string;
 }
 export declare const Config: Schema<Config>;
 interface RunResult {

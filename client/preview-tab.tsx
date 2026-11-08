@@ -33,6 +33,8 @@ export interface PreviewFace {
   readonly hasWebReview: () => boolean
   /** Open a URL in the right Sidebar (web-review's preview when installed). */
   readonly openInSidebar: (url: string) => void
+  /** Open the template gallery tab in this session. */
+  readonly openGallery?: () => void
 }
 
 const POLL_MS = 1500
@@ -100,6 +102,10 @@ export function PreviewView(props: PreviewFace) {
         sendPrefs()
         return
       }
+      if (d.type === 'updated') {
+        setRuntimeError(undefined)
+        return
+      }
       setRuntimeError(`${d.kind}: ${d.message}`)
       void call('reportRuntimeError', { sessionId, kind: d.kind, message: d.message, ...(d.stack ? { stack: d.stack } : {}) })
     }
@@ -136,6 +142,11 @@ export function PreviewView(props: PreviewFace) {
           ))}
         </div>
         <span style={{ flex: 1 }} />
+        {props.openGallery ? (
+          <button type="button" style={btn(false)} onClick={props.openGallery}>
+            模板画廊
+          </button>
+        ) : null}
         <button type="button" style={btn(false)} disabled={!fullUrl} onClick={() => fullUrl && window.open(fullUrl, '_blank', 'noopener')}>
           浏览器打开
         </button>

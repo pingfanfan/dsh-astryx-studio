@@ -19,6 +19,7 @@ import { loadAstryxApi } from './astryx.js'
 import { formatRuntimeErrors, PreviewManager } from './preview/manager.js'
 import type { Spawner } from './preview/server.js'
 import { createRpcHandler, fetchRoutes } from './rpc.js'
+import { defaultPrefsFile, thumbRoute } from './gallery.js'
 import { Config, DEFAULT_CONFIG } from './config.js'
 import { runProcess, type Runner } from './proc.js'
 import { PROMPT_SECTION_NAME, PROMPT_TEXT, SKILL_REGISTRATION } from './prompt.js'
@@ -106,18 +107,28 @@ export function apply(ctx: Context, config: Partial<Config> = {}, overrides: Ove
 
   // After a DSH restart the manager has forgotten which workspace a session uses:
   // resolve it from the live agent's working directory when the tab asks.
+  let followup: ((sessionId: string, text: string) => boolean) | undefined
   ctx.plugin({
     name: 'astryx-studio-session-resolver',
     inject: ['agents', 'workingDirectory'],
     apply(sub: Context) {
       sub.effect(() => {
+        followup = (sessionId, text) => {
+          const agent = sub.agents.get(sessionId as never)
+          if (!agent) return false
+          agent.followup(createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } }))
+          return true
+        }
         manager.setResolver(async (sessionId) => {
           const agent = sub.agents.get(sessionId as never)
           if (!agent) return undefined
           const cwd = await sub.workingDirectory.ensure(agent)
           return detectWorkspace(cwd, cfg.appDir)
         })
-        return () => manager.setResolver(undefined)
+        return () => {
+          manager.setResolver(undefined)
+          followup = undefined
+        }
       }, 'astryx-studio: session resolver')
     },
   })
@@ -141,8 +152,11 @@ export function apply(ctx: Context, config: Partial<Config> = {}, overrides: Ove
           const file = (r.data as { output?: string }).output ?? out
           return relative(workspace, file.startsWith('/') ? file : join(workspace, file)) || file
         },
+        followup: (sessionId, text) => followup?.(sessionId, text) ?? false,
+        prefsFile: cfg.prefsFile || defaultPrefsFile(),
       })
       for (const route of fetchRoutes(handler)) sub.connection.fetch.register(route)
+      sub.connection.fetch.register(thumbRoute())
     },
   })
 

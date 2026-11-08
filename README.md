@@ -6,7 +6,7 @@ A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`) pl
 
 > **How this differs from [markmini1234/astryx](https://github.com/markmini1234/astryx):** that project restyles the dsh UI with Astryx. This plugin does the tools, verification and preview for pages you build with Astryx. It does not theme dsh.
 
-**Status: Day 2.** Tools, verify hook, prompt section, skill and the live preview tab work. The template gallery is not built yet.
+**Status: Day 3.** Tools, verify hook, prompt section, skill, the live preview tab and the template gallery all work. Not published yet; the bench is deferred.
 
 ## What it does
 
@@ -32,7 +32,9 @@ A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`) pl
 - **The footer** shows the Vite state and the latest verify result.
 - **Runtime errors** in the page show in the tab. They reach the model at its next step only if they happened after its last write, and each distinct error only once.
 
-Screenshots: [docs/preview-day2.md](docs/preview-day2.md).
+**Template gallery.** The **Astryx 模板画廊** tab (also reachable from the preview toolbar) shows all 57 page templates with thumbnails, category filters and search. Clicking one sends 「用 `<id>` 模板开始」 as an ordinary user turn: the model still decides where the page goes and runs `astryx_template`. The toolbar choice (theme, dark mode, width) is also kept in `$DSH_HOME/astryx-studio/prefs.json`, so it survives a DSH restart on another port.
+
+Screenshots: [docs/preview-day2.md](docs/preview-day2.md), [docs/gallery-day3.md](docs/gallery-day3.md).
 
 `@astryxdesign/cli`, `core`, `build`, the 7 themes and the scaffold are pinned to the same version (0.7.11).
 
@@ -69,6 +71,12 @@ Expected: the five `astryx_*` tools in the tool list. Ask for a page and the **A
 | `tests/` | Unit tests per tool and hook, lint calibration over 57 templates, client smoke test; `ASTRYX_E2E=1` runs a real scaffold → template → tsc integration |
 
 `lib/` is committed so local-checkout and git installs need no build step.
+
+## Release-time assets
+
+- `pnpm exec tsx scripts/gen-thumbs.ts`: regenerates `assets/thumbs/*.png` (57 × 480×300, about 1 MiB) with Playwright.
+- `node scripts/gen-preview-svg.mjs`: regenerates `docs/preview.svg` and `docs/preview.zh.svg` (Plugin Manager detail images, lettering outlined from Noto Sans CJK SC).
+- `node scripts/gen-catalog.mjs` (run by `pnpm run build`): the playbook rules and template catalog from the pinned CLI.
 
 ## Scripts
 
