@@ -6,6 +6,7 @@ import { ALL, categoriesOf, filterGallery, type GalleryItem } from '../client/ga
 import { galleryItems, readPrefs, sanitizePrefs, startTemplateText, THUMB_DIR, thumbRoute } from '../src/gallery.js'
 import catalog from '../src/generated/catalog.json' with { type: 'json' }
 import { PreviewManager } from '../src/preview/manager.js'
+import { expandSearchWord, ZH_TERMS } from '../src/shared/zh-terms.js'
 import { createRpcHandler } from '../src/rpc.js'
 import { fakeRunner } from './helpers.js'
 
@@ -24,6 +25,43 @@ describe('gallery filtering (client)', () => {
     expect(filterGallery(items, 'Login', '').map((i) => i.id)).toEqual(['login', 'login-sso'])
     expect(filterGallery(items, ALL, 'LOGIN sign').map((i) => i.id)).toEqual(['login-sso'])
     expect(filterGallery(items, 'Dashboard', 'login')).toEqual([])
+  })
+
+  it('Chinese words search the real 57 templates through the term map', () => {
+    const all = galleryItems()
+    const ids = (q: string) => filterGallery(all, ALL, q).map((i) => i.id)
+    expect(ids('表格')).toEqual(expect.arrayContaining(['table', 'table-filter', 'table-tree', 'table-grouped']))
+    expect(ids('看板')).toEqual(expect.arrayContaining(['dashboard', 'dashboard-scorecard', 'kanban-board']))
+    expect(ids('登录')).toEqual(expect.arrayContaining(['login', 'login-card', 'login-split', 'login-sso']))
+    expect(ids('单点登录')).toEqual(['login-sso']) // longest term wins over 登录
+    expect(ids('漏斗')).toContain('dashboard-cohort-funnel')
+    expect(ids('设置')).toEqual(expect.arrayContaining(['settings', 'settings-dialog', 'settings-sidebar']))
+    expect(ids('画廊')).toEqual(expect.arrayContaining(['classic-gallery', 'mixed-gallery', 'product-gallery']))
+    // Glued terms all have to match: 分步表单 = (wizard|step) AND form.
+    const wizardForms = ids('分步表单')
+    expect(wizardForms).toEqual(expect.arrayContaining(['form-wizard', 'form-wizard-vertical']))
+    expect(wizardForms).not.toContain('contact-form')
+    // Mixed Chinese and English words.
+    expect(ids('表格 tree')).toEqual(['table-tree'])
+    // Unknown Chinese stays as itself and simply finds nothing.
+    expect(ids('量子纠缠')).toEqual([])
+    for (const q of ['表格', '看板', '登录', '表单', '聊天', '支付', '文档', '详情', '编辑器', '设置']) expect(ids(q).length, q).toBeGreaterThan(0)
+  })
+})
+
+describe('Chinese term map', () => {
+  it('splits glued Chinese into known terms, longest first', () => {
+    expect(expandSearchWord('Table')).toEqual([['table']])
+    expect(expandSearchWord('登录表单').map((g) => g[0])).toEqual(['登录', '表单'])
+    expect(expandSearchWord('单点登录').map((g) => g[0])).toEqual(['单点登录'])
+    expect(expandSearchWord('做一个数据看板').map((g) => g[0])).toEqual(['数据看板'])
+    expect(expandSearchWord('量子')).toEqual([['量子']])
+  })
+  it('every term maps to lowercase English words', () => {
+    for (const [k, v] of Object.entries(ZH_TERMS)) {
+      expect(v.length, k).toBeGreaterThan(0)
+      for (const w of v) expect(w, k).toMatch(/^[a-z][a-z-]*$/)
+    }
   })
 })
 

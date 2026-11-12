@@ -5,6 +5,7 @@
  */
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import type { RpcCall } from './preview-tab.js'
+import { expandSearchWord } from '../src/shared/zh-terms.js'
 
 export interface GalleryItem {
   readonly id: string
@@ -26,13 +27,17 @@ export function categoriesOf(items: readonly GalleryItem[]): string[] {
   return [ALL, ...new Set(items.map((i) => i.category))]
 }
 
-/** Category + free-text filter over id, name, description and category (case-insensitive, all words must match). */
+/**
+ * Category + free-text filter over id, name, description and category
+ * (case-insensitive, every word must match). Chinese words go through the
+ * term map, so 表格 finds table templates and 登录表单 needs both login and form.
+ */
 export function filterGallery(items: readonly GalleryItem[], category: string, query: string): GalleryItem[] {
-  const words = query.toLowerCase().split(/\s+/).filter(Boolean)
+  const groups = query.split(/\s+/).filter(Boolean).flatMap(expandSearchWord)
   return items.filter((i) => {
     if (category !== ALL && i.category !== category) return false
     const hay = `${i.id} ${i.name} ${i.description} ${i.category}`.toLowerCase()
-    return words.every((w) => hay.includes(w))
+    return groups.every((alternatives) => alternatives.some((w) => hay.includes(w)))
   })
 }
 
@@ -73,7 +78,7 @@ export function GalleryView({ sessionId, call }: GalleryFace) {
       <div style={S.toolbar}>
         <input
           type="search"
-          placeholder="搜索模板（英文，如 dashboard / login / table）"
+          placeholder="搜索模板，如 看板 / 登录表单 / 表格 / dashboard"
           aria-label="搜索模板"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -88,7 +93,17 @@ export function GalleryView({ sessionId, call }: GalleryFace) {
         </div>
       </div>
       {notice ? <div style={S.notice}>{notice}</div> : null}
-      <div style={S.grid}>
+      {shown.length === 0 ? (
+        <div style={S.noMatch}>
+          <span>没有匹配的模板</span>
+          {query ? (
+            <button type="button" style={chip(false)} onClick={() => setQuery('')}>
+              清空搜索
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      <div style={shown.length === 0 ? S.hidden : S.grid}>
         {shown.map((item) => (
           <button key={item.id} type="button" style={S.card} title={item.description} onClick={() => void start(item)}>
             {item.thumb && !broken.has(item.id) ? (
@@ -108,7 +123,6 @@ export function GalleryView({ sessionId, call }: GalleryFace) {
           </button>
         ))}
       </div>
-      {shown.length === 0 ? <div style={S.empty}>没有匹配的模板</div> : null}
       <div style={S.footer}>
         {shown.length} / {items.length} 个页面模板 · 点击卡片 = 发送「用 &lt;id&gt; 模板开始」
       </div>
@@ -140,5 +154,8 @@ const S: Record<string, CSSProperties> = {
   id: { fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12, fontWeight: 600 },
   desc: { fontSize: 11, lineHeight: 1.4, color: 'var(--dsw-alias-label-tertiary, #888)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' },
   empty: { margin: 'auto', padding: 24, color: 'var(--dsw-alias-label-tertiary, #888)' },
+  // Takes the grid's place, so the message sits under the toolbar instead of at the bottom.
+  noMatch: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '32px 16px', color: 'var(--dsw-alias-label-tertiary, #888)' },
+  hidden: { display: 'none' },
   footer: { padding: '4px 10px', borderTop: '0.5px solid var(--dsw-alias-border-l3, #ddd)', color: 'var(--dsw-alias-label-tertiary, #888)' },
 }
