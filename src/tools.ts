@@ -12,6 +12,7 @@ import type { Runner } from './proc.js'
 import { detectWorkspace, isPlaceholder, pickPackageManager, planInstall, resolveInside, scaffold } from './workspace.js'
 import { readFileSync } from 'node:fs'
 import type { TscScheduler } from './verify/tsc.js'
+import { THEMES } from './shared/preview-protocol.js'
 
 export interface ToolEnv {
   readonly api: () => Promise<AstryxApi>
@@ -22,6 +23,31 @@ export interface ToolEnv {
   readonly tsc: TscScheduler
   /** astryx_template wrote a page: record it, ask the client to open the preview tab, start Vite. */
   readonly onTemplate?: (exec: ToolRunContext, workspace: string, page: string, installedPackages: boolean) => void
+  /** Screenshot the preview page (headless Chrome); absent where the Host cannot take one. */
+  readonly screenshot?: (exec: ToolRunContext, args: ScreenshotArgs) => Promise<ScreenshotValue>
+}
+
+export interface ScreenshotArgs {
+  readonly width: number
+  readonly fullPage: boolean
+  readonly page?: string
+  readonly theme?: string
+  readonly dark?: boolean
+}
+
+export interface ScreenshotValue {
+  /** Absolute path of the PNG; pass it to read_image. */
+  readonly path: string
+  /** Path relative to the workspace. */
+  readonly file: string
+  readonly page: string
+  readonly width: number
+  readonly height: number
+  readonly truncated: boolean
+  readonly theme: string
+  readonly dark: boolean
+  readonly pageState: 'ready' | 'error' | 'timeout'
+  readonly consoleErrors: readonly string[]
 }
 
 export const TOOL_NAMES = {
@@ -30,7 +56,11 @@ export const TOOL_NAMES = {
   component: 'astryx_component',
   search: 'astryx_search',
   render: 'astryx_render',
+  screenshot: 'astryx_screenshot',
 } as const
+
+/** Viewport widths astryx_screenshot accepts (phone to wide desktop). */
+export const SCREENSHOT_WIDTH = { min: 320, max: 2560, default: 1280 } as const
 
 type Json = null | boolean | number | string | Json[] | { [k: string]: Json }
 const json = (v: unknown): Json => JSON.parse(JSON.stringify(v ?? null)) as Json
@@ -338,5 +368,52 @@ export function createTools(env: ToolEnv): ToolDefinition[] {
     },
   })
 
-  return [build, template, component, search, render]
+  const tools: ToolDefinition[] = [build, template, component, search, render]
+  const shoot = env.screenshot
+  if (shoot) {
+    tools.push(
+      defineTool({
+        name: TOOL_NAMES.screenshot,
+        description:
+          'Screenshot the live preview of an Astryx page at an exact viewport width (headless Chrome, full page by default) and save a PNG. ' +
+          'Then call read_image on the returned path to look at it. Use it to check layout, overflow and long Chinese text at 1440 / 768 / 390 instead of starting your own browser or server.',
+        parameters: {
+          width: { type: 'integer', description: `Viewport width in px, ${SCREENSHOT_WIDTH.min}–${SCREENSHOT_WIDTH.max} (default ${SCREENSHOT_WIDTH.default}; phone 390, tablet 768).` },
+          full_page: { type: 'boolean', description: 'Capture the whole page height (default true); false captures one 900 px viewport.' },
+          page: { type: 'string', description: 'Page module inside the workspace. Default: the page shown in the preview tab.' },
+          theme: { type: 'string', enum: [...THEMES], description: 'Theme. Default: the preview toolbar choice.' },
+          dark: { type: 'boolean', description: 'Dark mode. Default: the preview toolbar choice.' },
+        },
+        output: {
+          schema: { type: 'json' },
+          render: (_a, raw) => {
+            const v = raw as unknown as ScreenshotValue
+            const lines = [
+              `saved ${v.path} (${v.width}×${v.height}${v.truncated ? ', cut at max height' : ''}, ${v.theme}${v.dark ? ' dark' : ''}) — call read_image on it to look`,
+            ]
+            if (v.pageState === 'error') lines.push('the page failed to render: the screenshot shows the error')
+            if (v.pageState === 'timeout') lines.push('the page never reported ready: the screenshot may be incomplete')
+            for (const e of v.consoleErrors) lines.push(`console error: ${e}`)
+            return text(lines.join('\n'))
+          },
+        },
+        isConcurrencySafe: () => false,
+        timeoutMs: 90_000,
+        async execute(args, exec) {
+          const raw = args.width ?? SCREENSHOT_WIDTH.default
+          const width = Math.round(Math.min(Math.max(raw, SCREENSHOT_WIDTH.min), SCREENSHOT_WIDTH.max))
+          return json(
+            await shoot(exec, {
+              width,
+              fullPage: args.full_page !== false,
+              ...(args.page ? { page: args.page } : {}),
+              ...(args.theme ? { theme: args.theme } : {}),
+              ...(args.dark !== undefined ? { dark: args.dark } : {}),
+            }),
+          )
+        },
+      }) as ToolDefinition,
+    )
+  }
+  return tools
 }

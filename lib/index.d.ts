@@ -7,6 +7,7 @@
  */
 import { UserMessage } from "@deepseek-ai/dsh-llm";
 import Schema from "@deepseek-ai/schemastery";
+import { ToolRunContext } from "@deepseek-ai/dsh-tools";
 import { Context } from "@deepseek-ai/cordis";
 import { SubprocessRuntime } from "@deepseek-ai/dsh-subprocess";
 interface CliResponse {
@@ -66,6 +67,8 @@ export interface Config {
   maxReportedErrors: number;
   /** Preview toolbar prefs file; empty means $DSH_HOME/astryx-studio/prefs.json. */
   prefsFile: string;
+  /** Chrome / Chromium / Edge binary for astryx_screenshot; empty means auto-detect the installed one. */
+  chromePath: string;
 }
 export declare const Config: Schema<Config>;
 interface RunResult {
@@ -84,6 +87,68 @@ interface RunOptions {
   readonly shell?: boolean;
 }
 type Runner = (command: string, args: readonly string[], options: RunOptions) => Promise<RunResult>;
+interface TscDiagnostic {
+  readonly file: string;
+  readonly line: number;
+  readonly column: number;
+  readonly code: string;
+  readonly message: string;
+}
+type TscOutcome = {
+  readonly kind: 'pass';
+  readonly ms: number;
+} | {
+  readonly kind: 'fail';
+  readonly ms: number;
+  readonly diagnostics: readonly TscDiagnostic[];
+} | {
+  readonly kind: 'unverified';
+  readonly ms: number;
+  readonly reason: string;
+};
+interface TscScheduler {
+  /** Start a run for `workspace`, aborting any run in flight there. Resolves with its outcome, or undefined if superseded. */
+  schedule(workspace: string): Promise<TscOutcome | undefined>;
+  /** Take (and clear) the newest completed outcome for `workspace`. */
+  take(workspace: string): TscOutcome | undefined;
+  /** The run in flight for `workspace`, if any (resolves when it settles, whatever the outcome). */
+  inflight(workspace: string): Promise<unknown> | undefined;
+  /** Abort everything (plugin dispose). */
+  dispose(): void;
+}
+interface ToolEnv {
+  readonly api: () => Promise<AstryxApi>;
+  /** Session cwd for a call, or undefined outside an agent. */
+  readonly cwdOf: (exec: ToolRunContext) => Promise<string | undefined>;
+  readonly config: Config;
+  readonly run: Runner;
+  readonly tsc: TscScheduler;
+  /** astryx_template wrote a page: record it, ask the client to open the preview tab, start Vite. */
+  readonly onTemplate?: (exec: ToolRunContext, workspace: string, page: string, installedPackages: boolean) => void;
+  /** Screenshot the preview page (headless Chrome); absent where the Host cannot take one. */
+  readonly screenshot?: (exec: ToolRunContext, args: ScreenshotArgs) => Promise<ScreenshotValue>;
+}
+interface ScreenshotArgs {
+  readonly width: number;
+  readonly fullPage: boolean;
+  readonly page?: string;
+  readonly theme?: string;
+  readonly dark?: boolean;
+}
+interface ScreenshotValue {
+  /** Absolute path of the PNG; pass it to read_image. */
+  readonly path: string;
+  /** Path relative to the workspace. */
+  readonly file: string;
+  readonly page: string;
+  readonly width: number;
+  readonly height: number;
+  readonly truncated: boolean;
+  readonly theme: string;
+  readonly dark: boolean;
+  readonly pageState: 'ready' | 'error' | 'timeout';
+  readonly consoleErrors: readonly string[];
+}
 export declare const name = "dsh-astryx-studio";
 export declare const inject: string[];
 export declare const MESSAGE_SOURCE = "astryx-studio";
@@ -102,6 +167,8 @@ export interface Overrides {
   api?: typeof loadAstryxApi;
   /** Replaces ctx.subprocess for the preview Vite. */
   spawner?: Spawner;
+  /** Replaces the headless-Chrome screenshot; `null` leaves astryx_screenshot unregistered. */
+  screenshot?: ToolEnv['screenshot'] | null;
 }
 /** Adapt DSH's `ctx.subprocess` to the preview server's spawner. */
 export declare function subprocessSpawner(subprocess: SubprocessRuntime): Spawner;

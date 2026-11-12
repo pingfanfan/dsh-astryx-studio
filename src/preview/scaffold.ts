@@ -139,6 +139,7 @@ class Boundary extends Component<{children: ReactNode; resetKey: string}, {error
     return {error};
   }
   componentDidCatch(error: Error) {
+    document.documentElement.dataset.astryxStudio = 'error';
     reportError('render', error);
   }
   componentDidUpdate(prev: {resetKey: string}) {
@@ -190,11 +191,15 @@ function App() {
       setMissing(null);
       setWaiting(null);
       setPage(() => m.default);
+      // Readiness for astryx_screenshot (headless Chrome polls this attribute).
+      document.documentElement.dataset.astryxStudio = 'ready';
       post({type: 'ready', page: params.page});
     }, (error) => {
       const delay = retryLoad(error);
-      if (delay === undefined) reportError('render', error);
-      else setWaiting(delay);
+      if (delay === undefined) {
+        document.documentElement.dataset.astryxStudio = 'error';
+        reportError('render', error);
+      } else setWaiting(delay);
     });
   }, [params.page]);
 

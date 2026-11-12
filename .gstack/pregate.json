@@ -3,6 +3,9 @@
   "runner": "npx vitest run {files}",
   "dependencies": {
     "src/preview/**": ["tests/preview.test.ts"],
+    "src/preview/shot.ts": ["tests/shot.test.ts"],
+    "src/prompt.ts": ["tests/host.test.ts"],
+    "src/config.ts": ["tests/host.test.ts"],
     "src/shared/**": ["tests/preview.test.ts", "tests/client.test.ts"],
     "src/rpc.ts": ["tests/preview.test.ts"],
     "src/gallery.ts": ["tests/gallery.test.ts"],

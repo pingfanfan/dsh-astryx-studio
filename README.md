@@ -6,7 +6,7 @@ A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`) pl
 
 > **How this differs from [markmini1234/astryx](https://github.com/markmini1234/astryx):** that project restyles the dsh UI with Astryx. This plugin does the tools, verification and preview for pages you build with Astryx. It does not theme dsh.
 
-**Status: Day 3.** Tools, verify hook, prompt section, skill, the live preview tab and the template gallery all work. Not published yet; the bench is deferred.
+**Status: 0.1.x.** Tools, verify hook, prompt section, skill, the live preview tab, preview screenshots for the model and the template gallery all work. On GitHub; not on npm yet. The bench is deferred.
 
 ## What it does
 
@@ -17,6 +17,7 @@ A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`) pl
 | `astryx_component(name)` | `component(--dense --zh)` | Props before editing a component. |
 | `astryx_search(query, type?, limit?)` | `search()` | |
 | `astryx_render(file, out?)` | `render()` (experimental) | Single-file HTML export. |
+| `astryx_screenshot(width?, full_page?, page?, theme?, dark?)` | headless Chrome over CDP | Full-page PNG of the live preview at an exact viewport width (390 is really 390), once the page reports ready, with entry animations off. Returns the path for DSH's `read_image` plus the page's console errors. Uses the installed Chrome / Chromium / Edge (`chromePath` to override); registered only where the Host can take one. |
 
 **Verify hook.** For `write` / `edit` / `apply_patch` / `str_replace_editor` on `.ts/.tsx` inside the Astryx workspace:
 
@@ -31,8 +32,9 @@ A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`) pl
 - **The toolbar** switches between the 7 themes, dark mode and three widths (desktop / tablet / 390) without the model and without recompiling; the choice survives a refresh. It can also open the page in the browser or export single-file HTML.
 - **The footer** shows the Vite state and the latest verify result.
 - **Runtime errors** in the page show in the tab. They reach the model at its next step only if they happened after its last write, and each distinct error only once.
+- **First load.** Vite optimizes every dependency of the harness and the pages in one pass at startup. A page module that fails to *fetch* (packages still installing) is retried with backoff for about 50 s behind a waiting message, and only then reported. When `astryx_template` installs packages into a workspace whose preview Vite is running, that Vite restarts. If a model write gets no HMR update within 4 s, the tab reloads the iframe.
 
-**Template gallery.** The **Astryx 模板画廊** tab (also reachable from the preview toolbar) shows all 57 page templates with thumbnails, category filters and search. Clicking one sends 「用 `<id>` 模板开始」 as an ordinary user turn: the model still decides where the page goes and runs `astryx_template`. The toolbar choice (theme, dark mode, width) is also kept in `$DSH_HOME/astryx-studio/prefs.json`, so it survives a DSH restart on another port.
+**Template gallery.** The **Astryx 模板画廊** tab (also reachable from the preview toolbar) shows all 57 page templates with thumbnails, category filters and search in English or Chinese (表格, 看板, 登录表单 map to the English words the templates use). Clicking one sends 「用 `<id>` 模板开始」 as an ordinary user turn: the model still decides where the page goes and runs `astryx_template`. The toolbar choice (theme, dark mode, width) is also kept in `$DSH_HOME/astryx-studio/prefs.json`, so it survives a DSH restart on another port.
 
 Screenshots: [docs/preview-day2.md](docs/preview-day2.md), [docs/gallery-day3.md](docs/gallery-day3.md).
 

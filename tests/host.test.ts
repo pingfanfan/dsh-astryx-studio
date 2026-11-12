@@ -41,10 +41,10 @@ function boot(cwd: string | undefined, services: Record<string, unknown> = {}) {
 }
 
 describe('host plugin registration', () => {
-  it('declares its services and registers 5 tools, one prompt section and the astryx-page skill; dispose cleans up', () => {
+  it('declares its services and registers 6 tools, one prompt section and the astryx-page skill; dispose cleans up', () => {
     expect(inject).toEqual(['tools', 'systemPrompt', 'skills', 'workingDirectory'])
     const f = boot(undefined)
-    expect(f.tools.map((t) => t.name)).toEqual(['astryx_build', 'astryx_template', 'astryx_component', 'astryx_search', 'astryx_render'])
+    expect(f.tools.map((t) => t.name)).toEqual(['astryx_build', 'astryx_template', 'astryx_component', 'astryx_search', 'astryx_render', 'astryx_screenshot'])
     expect(f.sections.map((s) => s.name)).toEqual([PROMPT_SECTION_NAME])
     expect(f.skills).toHaveLength(1)
     expect(f.skills[0]).toMatchObject({ name: SKILL_NAME, source: 'bundled' })

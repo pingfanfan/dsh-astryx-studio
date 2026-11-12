@@ -15,6 +15,8 @@ export interface Config {
   maxReportedErrors: number
   /** Preview toolbar prefs file; empty means $DSH_HOME/astryx-studio/prefs.json. */
   prefsFile: string
+  /** Chrome / Chromium / Edge binary for astryx_screenshot; empty means auto-detect the installed one. */
+  chromePath: string
 }
 
 export const Config: Schema<Config> = Schema.object({
@@ -25,6 +27,7 @@ export const Config: Schema<Config> = Schema.object({
   tscStepWaitMs: Schema.natural().default(5_000).description('Max wait (ms) at the next agent step for an in-flight tsc run.'),
   maxReportedErrors: Schema.natural().default(5).description('Max findings quoted per verify message.'),
   prefsFile: Schema.string().default('').description('Preview toolbar prefs file (default: $DSH_HOME/astryx-studio/prefs.json).'),
+  chromePath: Schema.string().default('').description('Chrome/Chromium/Edge binary for astryx_screenshot (default: auto-detect).'),
 }) as Schema<Config>
 
 export const DEFAULT_CONFIG: Config = {
@@ -35,4 +38,5 @@ export const DEFAULT_CONFIG: Config = {
   tscStepWaitMs: 5_000,
   maxReportedErrors: 5,
   prefsFile: '',
+  chromePath: '',
 }

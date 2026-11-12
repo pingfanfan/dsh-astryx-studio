@@ -22,6 +22,7 @@ export const PROMPT_TEXT = [
   '6. 主题、暗色和预览宽度由预览工具条控制，不要为此改代码，除非用户明确要求写死。',
   '7. 中文文案通常比英文长 30–50%，替换文案后注意别撑破卡片和按钮。',
   '8. 插件建的项目里，`src/main.tsx` 已经包好 `<Theme>` 和 CSS（Vite 下不要加 `@astryxdesign/core/astryx.css`，它在 StyleX 构建里解析不到），只改页面文件。',
+  '9. 要看页面实际长什么样（布局、溢出、中文折行），调 `astryx_screenshot(width)` 截预览，再用 `read_image` 看返回的图片。常用宽度 1440 / 768 / 390。不要自己起浏览器、静态服务器或写截图脚本。',
   '',
   `Astryx playbook rules (from @astryxdesign/cli ${catalog.cliVersion}):`,
   ...catalog.rules.map((r) => `- ${r}`),
@@ -95,6 +96,7 @@ export const SKILL_CONTENT = [
   '- 每次文件工具写入 `.ts/.tsx` 后，同步检查语法和 lint（`<div>` / `style={{}}` / `stylex.create` 数量不得增加、import 白名单），失败时立刻收到 `astryx verify ✗`。',
   '- tsc 在后台跑，结果在下一步开头注入。看到 `TS2322` 一类 prop 错误时，先 `astryx_component` 查 props 再改。',
   '- 预览里的运行时错误（渲染报错、未捕获异常）也会在下一步注入，修复方式相同。',
+  '- 视觉检查：`astryx_screenshot` 用无头 Chrome 按精确宽度截整页（390 就是真 390），等页面渲染完成并关闭入场动画，返回 PNG 路径和页面控制台错误；用 `read_image` 打开路径查看。只在改了布局或用户要求多宽度检查时截图，每个宽度一张即可。',
 ].join('\n')
 
 export const SKILL_REGISTRATION = {

@@ -6,7 +6,7 @@
 
 > **和 [markmini1234/astryx](https://github.com/markmini1234/astryx) 的区别：** 那个项目用 Astryx 给 dsh 界面换主题；本插件为你用 Astryx 构建的页面提供工具、验证和预览，不改 dsh 的主题。
 
-**状态：Day 3。** 工具、验证钩子、prompt section、skill、实时预览 tab 和模板画廊都已可用。尚未发布，bench 延后。
+**状态：0.1.x。** 工具、验证钩子、prompt section、skill、实时预览 tab、给模型用的预览截图和模板画廊都已可用。代码已在 GitHub，尚未发布到 npm；bench 延后。
 
 ## 功能
 
@@ -17,6 +17,7 @@
 | `astryx_component(name)` | `component(--dense --zh)` | 改组件前先查 props。 |
 | `astryx_search(query, type?, limit?)` | `search()` | |
 | `astryx_render(file, out?)` | `render()`（实验） | 导出单文件 HTML。 |
+| `astryx_screenshot(width?, full_page?, page?, theme?, dark?)` | 无头 Chrome（CDP） | 按精确视口宽度给实时预览截整页 PNG（390 就是真 390），等页面报告渲染完成、关闭入场动画后再截。返回给 DSH `read_image` 用的路径和页面控制台错误。使用本机已装的 Chrome / Chromium / Edge（可用 `chromePath` 指定）；Host 截不了图时不注册。 |
 
 **验证钩子。** 对 Astryx 工作区里 `.ts/.tsx` 的 `write` / `edit` / `apply_patch` / `str_replace_editor` 写入：
 
@@ -31,8 +32,9 @@
 - **工具条**可以在 7 套主题、暗色和三种宽度（桌面 / 平板 / 390）之间切换，不经过模型、不重新编译，刷新后保留；也能在浏览器打开页面或导出单文件 HTML。
 - **页脚**显示 Vite 状态和最近一次 verify 结果。
 - **页面运行时错误**会显示在 tab 里。只有发生在模型最后一次写入之后的错误，才会在模型下一步注入，同一个错误只注入一次。
+- **首次加载。** Vite 启动时一次性预构建 harness 和全部页面的依赖。页面模块*获取失败*（依赖还在安装）时，预览显示等待提示并按退避重试约 50 秒，仍失败才报告。`astryx_template` 往一个预览 Vite 正在运行的工作区装了新包时，那个 Vite 会重启。模型写入后 4 秒内 iframe 没收到热更新，tab 会自动重载 iframe。
 
-**模板画廊。** 「Astryx 模板画廊」tab（也可以从预览工具条打开）展示全部 57 个页面模板，带缩略图、分类筛选和搜索。点一张卡片，会以普通用户消息的形式发送「用 `<id>` 模板开始」：放在哪、怎么写仍由模型决定并调用 `astryx_template`。工具条的选择（主题、暗色、宽度）同时保存在 `$DSH_HOME/astryx-studio/prefs.json`，DSH 换端口重启后也能恢复。
+**模板画廊。** 「Astryx 模板画廊」tab（也可以从预览工具条打开）展示全部 57 个页面模板，带缩略图、分类筛选和搜索；搜索支持中文（表格、看板、登录表单会映射到模板里用的英文词）。点一张卡片，会以普通用户消息的形式发送「用 `<id>` 模板开始」：放在哪、怎么写仍由模型决定并调用 `astryx_template`。工具条的选择（主题、暗色、宽度）同时保存在 `$DSH_HOME/astryx-studio/prefs.json`，DSH 换端口重启后也能恢复。
 
 截图见 [docs/preview-day2.md](docs/preview-day2.md)、[docs/gallery-day3.md](docs/gallery-day3.md)。
 

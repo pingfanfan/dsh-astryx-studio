@@ -16,17 +16,20 @@ import type { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import type { ToolExecution, ToolRunContext } from '@deepseek-ai/dsh-tools'
 import { join, relative } from 'node:path'
 import { loadAstryxApi } from './astryx.js'
-import { formatRuntimeErrors, PreviewManager } from './preview/manager.js'
+import { DEFAULT_PAGE, formatRuntimeErrors, PreviewManager } from './preview/manager.js'
+import { PREVIEW_DIR } from './preview/scaffold.js'
+import { captureScreenshot, findChrome } from './preview/shot.js'
+import { previewQuery, type ThemeName } from './shared/preview-protocol.js'
 import type { Spawner } from './preview/server.js'
 import { createRpcHandler, fetchRoutes } from './rpc.js'
-import { defaultPrefsFile, thumbRoute } from './gallery.js'
+import { defaultPrefsFile, readPrefs, thumbRoute } from './gallery.js'
 import { Config, DEFAULT_CONFIG } from './config.js'
 import { runProcess, type Runner } from './proc.js'
 import { PROMPT_SECTION_NAME, PROMPT_TEXT, SKILL_REGISTRATION } from './prompt.js'
-import { createTools, TOOL_NAMES } from './tools.js'
+import { createTools, TOOL_NAMES, type ScreenshotArgs, type ScreenshotValue, type ToolEnv } from './tools.js'
 import { createTscScheduler } from './verify/tsc.js'
 import { isFileTool, Verifier } from './verify/verifier.js'
-import { detectWorkspace } from './workspace.js'
+import { detectWorkspace, resolveInside } from './workspace.js'
 
 export { Config }
 export const name = 'dsh-astryx-studio'
@@ -51,6 +54,8 @@ export interface Overrides {
   api?: typeof loadAstryxApi
   /** Replaces ctx.subprocess for the preview Vite. */
   spawner?: Spawner
+  /** Replaces the headless-Chrome screenshot; `null` leaves astryx_screenshot unregistered. */
+  screenshot?: ToolEnv['screenshot'] | null
 }
 
 /** Adapt DSH's `ctx.subprocess` to the preview server's spawner. */
@@ -169,6 +174,33 @@ export function apply(ctx: Context, config: Partial<Config> = {}, overrides: Ove
     }
   }
 
+  const prefsFile = cfg.prefsFile || defaultPrefsFile()
+  const takeScreenshot = async (exec: ToolRunContext, a: ScreenshotArgs): Promise<ScreenshotValue> => {
+    const sessionId = exec.agent?.id
+    const known = sessionId ? manager.status(sessionId) : undefined
+    const cwd = await cwdOf(exec)
+    const workspace = known?.workspace ?? (cwd ? detectWorkspace(cwd, cfg.appDir) : undefined)
+    if (!workspace) throw new Error('no Astryx workspace here; create a page with astryx_template first')
+    const page = a.page ? relative(workspace, resolveInside(workspace, a.page)) : (known?.page ?? DEFAULT_PAGE)
+    const chrome = findChrome(cfg.chromePath)
+    if (!chrome) {
+      throw new Error(
+        cfg.chromePath
+          ? `chromePath "${cfg.chromePath}" does not exist`
+          : 'no Chrome, Chromium or Edge found; install one or set the plugin option chromePath. Do not try to install a browser yourself.',
+      )
+    }
+    const preview = await manager.ensure(workspace)
+    if (preview.state !== 'running' || !preview.url) throw new Error(`the preview Vite is not running (${preview.state}): ${preview.error ?? ''}`)
+    const prefs = readPrefs(prefsFile)
+    const theme = (a.theme ?? prefs?.theme ?? 'neutral') as ThemeName
+    const dark = a.dark ?? prefs?.dark ?? false
+    const name = page.replace(/^src[\\/]/, '').replace(/[\\/]/g, '_').replace(/\.tsx?$/, '')
+    const out = join(workspace, PREVIEW_DIR, 'shots', `${name}-${a.width}${dark ? '-dark' : ''}.png`)
+    const r = await captureScreenshot({ chrome, url: preview.url + previewQuery(page, theme, dark), width: a.width, fullPage: a.fullPage, out, signal: exec.signal })
+    return { path: r.file, file: relative(workspace, r.file), page, width: r.width, height: r.height, truncated: r.truncated, theme, dark, pageState: r.pageState, consoleErrors: r.consoleErrors }
+  }
+
   for (const tool of createTools({
     api,
     cwdOf: (exec: ToolRunContext) => cwdOf(exec),
@@ -176,6 +208,7 @@ export function apply(ctx: Context, config: Partial<Config> = {}, overrides: Ove
     run,
     tsc,
     onTemplate: (exec, workspace, page, installed) => manager.templateWritten(exec.agent?.id, workspace, page, installed),
+    ...(overrides.screenshot === null ? {} : { screenshot: overrides.screenshot ?? ((exec, a) => takeScreenshot(exec, a)) }),
   })) {
     ctx.effect(() => ctx.tools.register(tool), `astryx-studio: ${tool.name}`)
   }

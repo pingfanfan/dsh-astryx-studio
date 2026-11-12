@@ -5,7 +5,7 @@ import type { ToolDefinition, ToolRunContext } from '@deepseek-ai/dsh-tools'
 import { PLUGIN_ROOT, type AstryxApi, type CliResponse } from '../src/astryx.js'
 import { DEFAULT_CONFIG } from '../src/config.js'
 import catalog from '../src/generated/catalog.json' with { type: 'json' }
-import { createTools, renderBuild, shapeBuild, TOOL_NAMES, type BuildValue } from '../src/tools.js'
+import { createTools, renderBuild, shapeBuild, TOOL_NAMES, type BuildValue, type ScreenshotArgs, type ScreenshotValue } from '../src/tools.js'
 import { PLACEHOLDER_SOURCE } from '../src/workspace.js'
 import { createTscScheduler } from '../src/verify/tsc.js'
 import { fakeRunner, ok, tempProject, tick } from './helpers.js'
@@ -41,8 +41,52 @@ function setup(opts: { cwd?: string; api?: AstryxApi } = {}) {
 }
 
 describe('tool set', () => {
-  it('registers the five Astryx tools', () => {
-    expect(setup().tools.map((t) => t.name)).toEqual(Object.values(TOOL_NAMES))
+  it('registers the five Astryx tools, plus astryx_screenshot when the Host can take one', () => {
+    const five = Object.values(TOOL_NAMES).filter((n) => n !== TOOL_NAMES.screenshot)
+    expect(setup().tools.map((t) => t.name)).toEqual(five)
+    const runner = fakeRunner()
+    const tsc = createTscScheduler({ run: runner.run, timeoutMs: 1000 })
+    const withShot = createTools({ api: async () => fakeApi(), cwdOf: async () => undefined, config: DEFAULT_CONFIG, run: runner.run, tsc, screenshot: async () => ({}) as never })
+    expect(withShot.map((t) => t.name)).toEqual(Object.values(TOOL_NAMES))
+  })
+})
+
+describe('astryx_screenshot', () => {
+  function shotTool() {
+    const runner = fakeRunner()
+    const tsc = createTscScheduler({ run: runner.run, timeoutMs: 1000 })
+    const calls: ScreenshotArgs[] = []
+    const value: ScreenshotValue = {
+      path: '/w/.astryx-studio/shots/pages_main_page-390.png', file: '.astryx-studio/shots/pages_main_page-390.png', page: 'src/pages/main/page.tsx',
+      width: 390, height: 4463, truncated: false, theme: 'matcha', dark: true, pageState: 'ready', consoleErrors: ['TypeError: x is undefined'],
+    }
+    const tools = createTools({
+      api: async () => fakeApi(), cwdOf: async () => undefined, config: DEFAULT_CONFIG, run: runner.run, tsc,
+      screenshot: async (_exec, a) => (calls.push(a), value),
+    })
+    return { tool: tools.find((t) => t.name === TOOL_NAMES.screenshot) as ToolDefinition, calls, exec: { signal: new AbortController().signal } as ToolRunContext }
+  }
+
+  it('defaults to a 1280 full-page shot and clamps the width to 320–2560', async () => {
+    const { tool, calls, exec } = shotTool()
+    await tool.execute({}, exec)
+    await tool.execute({ width: 100, full_page: false, dark: true, theme: 'gothic', page: 'src/pages/a.tsx' }, exec)
+    await tool.execute({ width: 9999 }, exec)
+    expect(calls).toEqual([
+      { width: 1280, fullPage: true },
+      { width: 320, fullPage: false, dark: true, theme: 'gothic', page: 'src/pages/a.tsx' },
+      { width: 2560, fullPage: true },
+    ])
+  })
+
+  it('tells the model to read the PNG with read_image and passes console errors on', async () => {
+    const { tool, exec } = shotTool()
+    const v = await tool.execute({ width: 390 }, exec)
+    const rendered = JSON.stringify(tool.output?.render?.({ width: 390 } as never, v as never))
+    expect(rendered).toContain('read_image')
+    expect(rendered).toContain('390×4463')
+    expect(rendered).toContain('matcha dark')
+    expect(rendered).toContain('console error: TypeError: x is undefined')
   })
 })
 
