@@ -70,6 +70,19 @@ describe('preview harness scaffold', () => {
     expect(main).not.toContain('astryx.css')
   })
 
+  it('main.tsx swaps in the HMR-updated page module, so a rewritten page with a new default component is not left stale', () => {
+    const main = previewFiles('/w')[`${PREVIEW_DIR}/main.tsx`]!
+    // Re-imports the exact module version the Vite client just executed…
+    expect(main).toContain("import(/* @vite-ignore */ u.path + '?t=' + u.timestamp)")
+    expect(main).toContain("u.path.endsWith('/' + params.page)")
+    expect(main).toContain("u.type === 'js-update'")
+    // …and renders its default export; 'updated' is posted only after that swap.
+    expect(main).toContain('setPage((old) => (old === next ? old : next))')
+    expect(main).toContain(".finally(() => post({type: 'updated'}))")
+    // Readiness for astryx_screenshot.
+    expect(main).toContain("document.documentElement.dataset.astryxStudio = 'ready'")
+  })
+
   it('main.tsx retries a page module that fails to fetch (install / re-optimize) before reporting it', () => {
     const main = previewFiles('/w')[`${PREVIEW_DIR}/main.tsx`]!
     expect(main).toContain(`const RETRY_DELAYS = ${JSON.stringify(LOAD_RETRY_DELAYS)};`)

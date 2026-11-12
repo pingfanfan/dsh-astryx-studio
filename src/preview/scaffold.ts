@@ -10,7 +10,7 @@ import { THEMES } from '../shared/preview-protocol.js'
 
 export const PREVIEW_DIR = '.astryx-studio'
 /** Bumped when the generated files change, so old harnesses are rewritten. */
-export const HARNESS_VERSION = 4
+export const HARNESS_VERSION = 5
 
 /**
  * Delays (ms) between reloads when the page module fails to load as a network
@@ -125,12 +125,21 @@ function reportError(kind: string, error: unknown) {
 }
 window.addEventListener('error', (event) => reportError('window', event.error ?? event.message));
 window.addEventListener('unhandledrejection', (event) => reportError('promise', event.reason));
+// HMR updates of JS modules, for App: the page component it renders is held in state, so
+// Fast Refresh alone cannot replace it when the model rewrites the page and the default
+// export becomes a different component (e.g. the template's DashboardPage -> GymPage).
+type JsUpdate = {type: string; path: string; timestamp: number};
+const updateListeners = new Set<(u: JsUpdate) => Promise<void>>();
 if (import.meta.hot) {
   import.meta.hot.on('vite:error', (payload: {err: {message: string; stack?: string}}) =>
     post({type: 'error', kind: 'vite', message: payload.err.message, stack: payload.err.stack}),
   );
   // After an HMR update the tab clears its error bar; an error that survives is re-posted by the render.
-  import.meta.hot.on('vite:afterUpdate', () => post({type: 'updated'}));
+  // 'updated' goes out once the page module (if it changed) is swapped in, so it means "visible".
+  import.meta.hot.on('vite:afterUpdate', (payload: {updates?: JsUpdate[]}) => {
+    const js = (payload.updates ?? []).filter((u) => u.type === 'js-update');
+    void Promise.all(js.flatMap((u) => [...updateListeners].map((l) => l(u)))).finally(() => post({type: 'updated'}));
+  });
 }
 
 class Boundary extends Component<{children: ReactNode; resetKey: string}, {error?: Error}> {
@@ -201,6 +210,26 @@ function App() {
         reportError('render', error);
       } else setWaiting(delay);
     });
+  }, [params.page]);
+
+  useEffect(() => {
+    // Re-import the exact module version HMR just executed (same URL and timestamp the Vite
+    // client used) and render its default export. A same-family component is a no-op for
+    // React Refresh (no remount); a different component is swapped in instead of staying stale.
+    const onUpdate = async (u: JsUpdate) => {
+      if (!u.path.endsWith('/' + params.page)) return;
+      try {
+        const m = (await import(/* @vite-ignore */ u.path + '?t=' + u.timestamp)) as {default?: ComponentType};
+        const next = m.default;
+        if (next) setPage((old) => (old === next ? old : next));
+      } catch (error) {
+        reportError('render', error);
+      }
+    };
+    updateListeners.add(onUpdate);
+    return () => {
+      updateListeners.delete(onUpdate);
+    };
   }, [params.page]);
 
   useEffect(() => {
