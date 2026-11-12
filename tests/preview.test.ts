@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { formatRuntimeErrors, PreviewManager } from '../src/preview/manager.js'
-import { missingPreviewPackages, PREVIEW_DIR, previewFiles, writePreviewHarness } from '../src/preview/scaffold.js'
+import { LOAD_RETRY_DELAYS, missingPreviewPackages, PREVIEW_DIR, previewFiles, writePreviewHarness } from '../src/preview/scaffold.js'
 import { parseVitePort, PreviewServer, type SpawnedProcess, type Spawner } from '../src/preview/server.js'
 import { createRpcHandler, fetchRoutes } from '../src/rpc.js'
 import { THEMES } from '../src/shared/preview-protocol.js'
@@ -53,6 +53,9 @@ describe('preview harness scaffold', () => {
     expect(allow).toContain('"/w/node_modules"')
     expect(allow).not.toMatch(/"\/w"\s*,/)
     expect(cfg).toContain('astryxStylex({rootDir: workspace})')
+    // Every dependency optimized at startup: no mid-load "optimized dependencies changed. reloading".
+    expect(cfg).toContain("entries: ['index.html', '../src/**/*.tsx']")
+    expect(cfg).toContain("'react-dom/client'")
   })
 
   it('main.tsx reads ?page&theme&dark, preloads all 7 themes, and reports errors to the parent', () => {
@@ -65,6 +68,29 @@ describe('preview harness scaffold', () => {
       expect(main).toContain(s)
     }
     expect(main).not.toContain('astryx.css')
+  })
+
+  it('main.tsx retries a page module that fails to fetch (install / re-optimize) before reporting it', () => {
+    const main = previewFiles('/w')[`${PREVIEW_DIR}/main.tsx`]!
+    expect(main).toContain(`const RETRY_DELAYS = ${JSON.stringify(LOAD_RETRY_DELAYS)};`)
+    expect(main).toContain('location.reload()')
+    expect(main).toContain('sessionStorage')
+    expect(main).toContain('正在等待依赖安装或预构建完成')
+    // The pattern the harness uses must match what browsers actually throw, and not ordinary bugs.
+    const pattern = /const FETCH_ERROR = (\/.+\/i);/.exec(main)?.[1]
+    expect(pattern).toBeDefined()
+    const re = new Function(`return ${pattern}`)() as RegExp
+    for (const m of [
+      'Failed to fetch dynamically imported module: http://127.0.0.1:5174/src/pages/main/page.tsx', // Chromium
+      'Importing a module script failed.', // Safari
+      'error loading dynamically imported module: http://127.0.0.1:5174/src/pages/main/page.tsx', // Firefox
+    ])
+      expect(re.test(m)).toBe(true)
+    for (const m of ["Cannot read properties of undefined (reading 'map')", 'x is not defined']) expect(re.test(m)).toBe(false)
+    // About 50 s in all: long enough for a template's pnpm add, short enough to surface a real failure.
+    const total = LOAD_RETRY_DELAYS.reduce((a, b) => a + b, 0)
+    expect(total).toBeGreaterThanOrEqual(30_000)
+    expect(total).toBeLessThanOrEqual(60_000)
   })
 
   it('lists theme packages the workspace still lacks', () => {
@@ -187,6 +213,42 @@ describe('preview manager', () => {
     m.modelWrote('s', '/w')
     expect(m.reportRuntimeError('s', e)).toBe(true) // a new write re-arms the same error
     expect(formatRuntimeErrors(m.takeRuntimeErrors('s'))).toContain('预览运行时错误')
+  })
+
+  it('restarts a running Vite when a template write installed packages (Vite caches failed resolutions)', async () => {
+    const ws = tempProject()
+    const { m, runner, procs } = manager()
+    m.templateWritten('s1', ws, 'src/pages/main/page.tsx')
+    await vi.waitFor(() => expect(runner.calls).toHaveLength(1))
+    runner.calls[0]!.resolve(ok())
+    await vi.waitFor(() => expect(procs).toHaveLength(1))
+    procs[0]!.emit(READY(40100))
+    await vi.waitFor(() => expect(m.status('s1').preview.state).toBe('running'))
+
+    m.templateWritten('s1', ws, 'src/pages/main/page.tsx', false) // nothing installed: keep the server
+    expect(procs).toHaveLength(1)
+    expect(procs[0]!.terminated).toBe(false)
+
+    m.templateWritten('s1', ws, 'src/pages/main/page.tsx', true)
+    expect(procs[0]!.terminated).toBe(true)
+    // The temp project has no theme packages, so the restart asks the (fake) runner again.
+    await vi.waitFor(() => expect(runner.calls).toHaveLength(2))
+    runner.calls[1]!.resolve(ok())
+    await vi.waitFor(() => expect(procs).toHaveLength(2))
+    procs[1]!.emit(READY(40101))
+    await vi.waitFor(() => expect(m.status('s1').preview.url).toBe('http://127.0.0.1:40101/'))
+    m.stopAll()
+  })
+
+  it('status carries lastWriteAt (Host clock) once the model wrote, for the tab HMR watchdog', () => {
+    const { m, now } = manager()
+    expect(m.status('s').lastWriteAt).toBeUndefined()
+    now.t = 5000
+    m.modelWrote('s', '/w')
+    expect(m.status('s').lastWriteAt).toBe(5000)
+    now.t = 7000
+    m.modelWrote('s', '/w')
+    expect(m.status('s').lastWriteAt).toBe(7000)
   })
 
   it('after a restart, open() resolves an unknown session to its workspace and the default page', async () => {

@@ -10,7 +10,15 @@ import { THEMES } from '../shared/preview-protocol.js'
 
 export const PREVIEW_DIR = '.astryx-studio'
 /** Bumped when the generated files change, so old harnesses are rewritten. */
-export const HARNESS_VERSION = 3
+export const HARNESS_VERSION = 4
+
+/**
+ * Delays (ms) between reloads when the page module fails to load as a network
+ * error. That happens while the template's packages are still installing or Vite
+ * is re-optimizing dependencies; it is not the model's bug, so it is retried
+ * quietly and only reported once every retry failed (about 50 s in all).
+ */
+export const LOAD_RETRY_DELAYS = [1000, 2000, 3000, 5000, 8000, 10000, 10000, 10000] as const
 
 export function themePackage(theme: string): string {
   return `@astryxdesign/theme-${theme}`
@@ -32,6 +40,13 @@ export default defineConfig({
   root: ${JSON.stringify(join(workspace, PREVIEW_DIR))},
   plugins: [...astryxStylex({rootDir: workspace}), react()],
   clearScreen: false,
+  // Scan the harness and every page up front, so all dependencies are optimized in one pass
+  // at startup. Without it Vite finds react-dom/client, recharts, heroicons… one by one while
+  // the page loads, reloads after each, and can leave the page on a mixed, stale module graph.
+  optimizeDeps: {
+    entries: ['index.html', '../src/**/*.tsx'],
+    include: ['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime', 'react/jsx-dev-runtime'],
+  },
   server: {
     host: '127.0.0.1',
     // Any local page can reach a dev server: serve the harness, the page sources and
@@ -60,6 +75,46 @@ type ThemeName = keyof typeof THEMES;
 
 const pages = import.meta.glob<{default: ComponentType}>('../src/**/*.tsx');
 const SOURCE = 'astryx-studio-preview';
+
+// A page module that fails to *fetch* (not to run) is a transient state: packages still
+// installing, or Vite re-optimizing dependencies. Reload with backoff before reporting it.
+const RETRY_DELAYS = ${JSON.stringify(LOAD_RETRY_DELAYS)};
+const RETRY_KEY = 'astryx-studio-load-retry';
+const FETCH_ERROR = /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|Outdated Optimize Dep/i;
+function retryCount(): number {
+  try {
+    return Number(sessionStorage.getItem(RETRY_KEY) ?? '0') || 0;
+  } catch {
+    return RETRY_DELAYS.length;
+  }
+}
+function setRetryCount(n: number) {
+  try {
+    if (n) sessionStorage.setItem(RETRY_KEY, String(n));
+    else sessionStorage.removeItem(RETRY_KEY);
+  } catch {}
+}
+// StrictMode runs the load effect twice in development: schedule one reload per page load.
+let scheduledDelay: number | undefined;
+let gaveUp = false;
+/** Schedules a reload and returns its delay, or returns undefined when the retries are spent. */
+function retryLoad(error: unknown): number | undefined {
+  if (scheduledDelay !== undefined) return scheduledDelay;
+  if (gaveUp) return undefined;
+  const message = error instanceof Error ? error.message : String(error);
+  if (!FETCH_ERROR.test(message)) return undefined;
+  const n = retryCount();
+  if (n >= RETRY_DELAYS.length) {
+    // Spent: report it, and give the next page load (e.g. after the model's fix) a fresh budget.
+    gaveUp = true;
+    setRetryCount(0);
+    return undefined;
+  }
+  setRetryCount(n + 1);
+  scheduledDelay = RETRY_DELAYS[n];
+  setTimeout(() => location.reload(), scheduledDelay);
+  return scheduledDelay;
+}
 
 function post(message: Record<string, unknown>) {
   window.parent?.postMessage({source: SOURCE, ...message}, '*');
@@ -111,6 +166,7 @@ function App() {
   const [params, setParams] = useState(readParams);
   const [Page, setPage] = useState<ComponentType | null>(null);
   const [missing, setMissing] = useState<string | null>(null);
+  const [waiting, setWaiting] = useState<number | null>(null);
 
   useEffect(() => {
     // The tab switches theme / dark mode by message: no reload, no recompile.
@@ -130,10 +186,16 @@ function App() {
       return;
     }
     load().then((m) => {
+      setRetryCount(0);
       setMissing(null);
+      setWaiting(null);
       setPage(() => m.default);
       post({type: 'ready', page: params.page});
-    }, (error) => reportError('render', error));
+    }, (error) => {
+      const delay = retryLoad(error);
+      if (delay === undefined) reportError('render', error);
+      else setWaiting(delay);
+    });
   }, [params.page]);
 
   useEffect(() => {
@@ -141,6 +203,7 @@ function App() {
   }, [params.dark]);
 
   if (missing) return <p style={{padding: 16, font: '13px system-ui'}}>No page at {missing}</p>;
+  if (waiting !== null) return <p style={{padding: 16, font: '13px system-ui', color: '#667085'}}>正在等待依赖安装或预构建完成，{Math.round(waiting / 1000)} 秒后重新加载…</p>;
   if (!Page) return null;
   return (
     <Theme theme={THEMES[params.theme]} mode={params.dark ? 'dark' : 'light'}>

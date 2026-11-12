@@ -57,7 +57,19 @@ export interface SessionStatus {
   readonly verify: VerifyStatus
   /** Incremented each time the Host asks the client to open the preview tab. */
   readonly openSeq: number
+  /**
+   * Host clock (ms) of the model's latest file write in this session. The tab
+   * reloads the iframe when a write gets no HMR update, so it never stays stuck
+   * on an old module graph.
+   */
+  readonly lastWriteAt?: number
 }
+
+/**
+ * How long the tab waits, after it notices a new write, for the iframe to
+ * report an HMR update or a fresh load before it reloads the iframe itself.
+ */
+export const HMR_WATCHDOG_MS = 4000
 
 export type RpcRequest =
   | { endpoint: 'status'; payload: { sessionId: string } }

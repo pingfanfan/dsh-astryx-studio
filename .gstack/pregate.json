@@ -1,0 +1,16 @@
+{
+  "$schema": "https://github.com/garrytan/gstack/docs/pregate.md#pregate-v1",
+  "runner": "npx vitest run {files}",
+  "dependencies": {
+    "src/preview/**": ["tests/preview.test.ts"],
+    "src/shared/**": ["tests/preview.test.ts", "tests/client.test.ts"],
+    "src/rpc.ts": ["tests/preview.test.ts"],
+    "src/gallery.ts": ["tests/gallery.test.ts"],
+    "src/tools.ts": ["tests/tools.test.ts"],
+    "src/verify/**": ["tests/verifier.test.ts", "tests/lint.test.ts", "tests/calibration.test.ts"],
+    "src/index.ts": ["tests/host.test.ts"],
+    "client/**": ["tests/client.test.ts", "tests/client-store.test.ts", "tests/gallery.test.ts"],
+    "lib/client.js": ["tests/client.test.ts"],
+    "lib/index.js": ["tests/host.test.ts"]
+  }
+}

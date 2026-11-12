@@ -69,8 +69,12 @@ export class PreviewManager {
     return s
   }
 
-  /** astryx_template wrote `page` in `workspace`: remember it, ask the client to open the tab, start Vite. */
-  templateWritten(sessionId: string | undefined, workspace: string, page: string): void {
+  /**
+   * astryx_template wrote `page` in `workspace`: remember it, ask the client to open the tab, start Vite.
+   * `installedPackages` is true when the tool just added packages: a Vite that was already running keeps
+   * its failed resolutions ("Failed to resolve import") cached until it restarts, so it is restarted.
+   */
+  templateWritten(sessionId: string | undefined, workspace: string, page: string, installedPackages = false): void {
     if (sessionId) {
       const s = this.session(sessionId)
       s.workspace = workspace
@@ -78,6 +82,8 @@ export class PreviewManager {
       s.openSeq++
       this.modelWrote(sessionId, workspace)
     }
+    const server = this.servers.get(workspace)
+    if (installedPackages && server?.status().state === 'running') server.stop()
     void this.ensure(workspace)
   }
 
@@ -143,6 +149,7 @@ export class PreviewManager {
       preview,
       verify: (s.workspace && this.verify.get(s.workspace)) || NONE,
       openSeq: s.openSeq,
+      ...(s.lastWriteAt ? { lastWriteAt: s.lastWriteAt } : {}),
     }
   }
 

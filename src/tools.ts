@@ -21,7 +21,7 @@ export interface ToolEnv {
   readonly run: Runner
   readonly tsc: TscScheduler
   /** astryx_template wrote a page: record it, ask the client to open the preview tab, start Vite. */
-  readonly onTemplate?: (exec: ToolRunContext, workspace: string, page: string) => void
+  readonly onTemplate?: (exec: ToolRunContext, workspace: string, page: string, installedPackages: boolean) => void
 }
 
 export const TOOL_NAMES = {
@@ -243,7 +243,7 @@ export function createTools(env: ToolEnv): ToolDefinition[] {
       }
       // Warm the incremental tsc cache in the background (first run 15–40 s).
       void env.tsc.schedule(workspace)
-      env.onTemplate?.(exec, workspace, targetPath)
+      env.onTemplate?.(exec, workspace, targetPath, installed.length > 0)
       const value: TemplateValue = {
         template: id,
         file: targetPath,

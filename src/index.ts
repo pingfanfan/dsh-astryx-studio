@@ -175,7 +175,7 @@ export function apply(ctx: Context, config: Partial<Config> = {}, overrides: Ove
     config: cfg,
     run,
     tsc,
-    onTemplate: (exec, workspace, page) => manager.templateWritten(exec.agent?.id, workspace, page),
+    onTemplate: (exec, workspace, page, installed) => manager.templateWritten(exec.agent?.id, workspace, page, installed),
   })) {
     ctx.effect(() => ctx.tools.register(tool), `astryx-studio: ${tool.name}`)
   }

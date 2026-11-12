@@ -5,6 +5,7 @@
  */
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react'
 import {
+  HMR_WATCHDOG_MS,
   PREVIEW_COMMAND_SOURCE,
   PREVIEW_MESSAGE_SOURCE,
   RPC_CHANNEL,
@@ -38,6 +39,8 @@ export interface PreviewFace {
 }
 
 const POLL_MS = 1500
+/** An HMR signal this long before the tab noticed a write still counts for it (the poll lags the write). */
+const HMR_SIGNAL_SLACK_MS = POLL_MS * 2
 
 export function iframeUrl(status: SessionStatus | undefined, theme: string, dark: boolean): string | undefined {
   if (!status?.preview.url || !status.page) return undefined
@@ -85,6 +88,26 @@ export function PreviewView(props: PreviewFace) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [base])
 
+  // HMR watchdog: a model write must reach the iframe as an HMR update (or a fresh load).
+  // If none arrives, the iframe is on a stale module graph (e.g. after Vite re-optimized
+  // dependencies mid-load), so reload it rather than show an old page.
+  const [reloadKey, setReloadKey] = useState(0)
+  const lastSignal = useRef(0)
+  const seenWrite = useRef<number | undefined>(undefined)
+  const lastWriteAt = status?.lastWriteAt
+  useEffect(() => {
+    if (lastWriteAt === undefined) return
+    const first = seenWrite.current === undefined
+    if (seenWrite.current === lastWriteAt) return
+    seenWrite.current = lastWriteAt
+    if (first) return
+    const noticedAt = Date.now()
+    const timer = setTimeout(() => {
+      if (lastSignal.current < noticedAt - HMR_SIGNAL_SLACK_MS) setReloadKey((k) => k + 1)
+    }, HMR_WATCHDOG_MS)
+    return () => clearTimeout(timer)
+  }, [lastWriteAt])
+
   const sendPrefs = useCallback(() => {
     const cmd: PreviewCommand = { source: PREVIEW_COMMAND_SOURCE, type: 'set', theme: prefs.get().theme, dark: prefs.get().dark }
     frame.current?.contentWindow?.postMessage(cmd, '*')
@@ -98,14 +121,17 @@ export function PreviewView(props: PreviewFace) {
       const d = event.data as PreviewMessage | undefined
       if (!d || d.source !== PREVIEW_MESSAGE_SOURCE) return
       if (d.type === 'ready') {
+        lastSignal.current = Date.now()
         setRuntimeError(undefined)
         sendPrefs()
         return
       }
       if (d.type === 'updated') {
+        lastSignal.current = Date.now()
         setRuntimeError(undefined)
         return
       }
+      lastSignal.current = Date.now()
       setRuntimeError(`${d.kind}: ${d.message}`)
       void call('reportRuntimeError', { sessionId, kind: d.kind, message: d.message, ...(d.stack ? { stack: d.stack } : {}) })
     }
@@ -168,6 +194,7 @@ export function PreviewView(props: PreviewFace) {
       <div style={S.stage}>
         {src ? (
           <iframe
+            key={reloadKey}
             ref={frame}
             title="Astryx 预览"
             src={src}
