@@ -234,6 +234,10 @@ export function scaffoldFiles(name: string, locale = ''): Record<string, string>
     'package.json': JSON.stringify(pkg, null, 2) + '\n',
     'tsconfig.json': JSON.stringify(tsconfig, null, 2) + '\n',
     '.gitignore': 'node_modules\ndist\n.astryx-studio\n',
+    // Its own pnpm workspace root: inside a parent workspace, every later pnpm command (the
+    // template's installs, the model's `pnpm add`, even `pnpm --version`) would otherwise run the
+    // parent's .pnpmfile.cjs and write the parent's lockfile.
+    'pnpm-workspace.yaml': '# This app is its own pnpm workspace root.\npackages:\n  - "."\n',
     'vite.config.ts': [
       "import {defineConfig} from 'vite';",
       "import react from '@vitejs/plugin-react';",

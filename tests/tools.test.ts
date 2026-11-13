@@ -206,7 +206,7 @@ describe('astryx_template', () => {
     expect(pkg.dependencies['@astryxdesign/core']).toBe(catalog.cliVersion)
     expect(pkg.devDependencies['@astryxdesign/build']).toBe(catalog.cliVersion)
     expect(pkg.devDependencies['@astryxdesign/cli']).toBe(catalog.cliVersion)
-    for (const f of ['vite.config.ts', 'index.html', 'tsconfig.json', 'src/main.tsx', '.gitignore']) expect(existsSync(join(cwd, 'astryx-app', f))).toBe(true)
+    for (const f of ['vite.config.ts', 'index.html', 'tsconfig.json', 'src/main.tsx', '.gitignore', 'pnpm-workspace.yaml']) expect(existsSync(join(cwd, 'astryx-app', f))).toBe(true)
     expect(readFileSync(join(cwd, 'astryx-app/src/main.tsx'), 'utf8')).not.toContain('astryx.css')
     expect((api as ReturnType<typeof fakeApi>).calls.find((c) => c[0] === 'template')![1][1]).toMatchObject({ cwd: join(cwd, 'astryx-app') })
   })

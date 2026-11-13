@@ -1,5 +1,5 @@
 // Real CLI + real pnpm + real tsc. Opt-in (network, ~1 min): ASTRYX_E2E=1 pnpm vitest run tests/integration.test.ts
-import { readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { ToolDefinition, ToolRunContext } from '@deepseek-ai/dsh-tools'
@@ -13,7 +13,16 @@ import { tempProject } from './helpers.js'
 
 describe.runIf(process.env.ASTRYX_E2E === '1')('real scaffold → template → verify', () => {
   it('scaffolds, writes dashboard, tsc passes, a wrong prop fails tsc', { timeout: 600_000 }, async () => {
-    const cwd = tempProject({}, false)
+    // The session folder is a pnpm workspace root with code of its own: creating ./astryx-app must
+    // not run its .pnpmfile.cjs or postinstall, nor write its lockfile.
+    const cwd = tempProject(
+      {
+        'pnpm-workspace.yaml': 'packages:\n  - "*"\n',
+        'package.json': JSON.stringify({ name: 'parent', private: true, scripts: { postinstall: 'node -e "require(\'fs\').writeFileSync(\'POSTINSTALL_RAN\', \'\')"' } }),
+        '.pnpmfile.cjs': "require('fs').writeFileSync(require('path').join(__dirname, 'PNPMFILE_RAN'), ''); module.exports = {}\n",
+      },
+      false,
+    )
     const tsc = createTscScheduler({ run: runProcess, timeoutMs: 120_000 })
     const tools = createTools({ api: loadAstryxApi, cwdOf: async () => cwd, config: DEFAULT_CONFIG, run: runProcess, tsc })
     const get = (n: string) => tools.find((t) => t.name === n) as ToolDefinition
@@ -22,6 +31,9 @@ describe.runIf(process.env.ASTRYX_E2E === '1')('real scaffold → template → v
     const kit = (await get(TOOL_NAMES.build).execute({ keywords: 'course sales dashboard revenue orders' }, exec)) as { start: { name: string } }
     const v = (await get(TOOL_NAMES.template).execute({ id: kit.start.name }, exec)) as { workspace: string; file: string; scaffolded: boolean; installed: string[] }
     expect(v.scaffolded).toBe(true)
+    expect(existsSync(join(cwd, 'PNPMFILE_RAN'))).toBe(false)
+    expect(existsSync(join(cwd, 'POSTINSTALL_RAN'))).toBe(false)
+    expect(existsSync(join(cwd, 'pnpm-lock.yaml'))).toBe(false)
     console.log('template result', JSON.stringify(v))
 
     const verifier = new Verifier({ tsc, maxReportedErrors: 5 })
