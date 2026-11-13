@@ -287,10 +287,18 @@ describe('preview manager', () => {
       'pnpm -C astryx-app install',
       'pnpm up recharts',
       '(cd astryx-app; pnpm add dayjs)',
+      'yarn',
+      'cd astryx-app && yarn',
+      'yarn --frozen-lockfile',
+      'bash -c "cd astryx-app && pnpm add dayjs"',
+      "sh -c 'npm i zod'",
     ])
       expect(installsPackages(c), c).toBe(true)
     for (const c of [
       'pnpm list',
+      'yarn build',
+      'yarn dev --port 3000',
+      "bash -c \"echo 'pnpm add later'\"",
       'npm view recharts version',
       'npm run build',
       'pnpm exec tsc --noEmit',

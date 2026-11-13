@@ -38,10 +38,20 @@ const NONE: VerifyStatus = { state: 'none', summary: '', at: 0 }
  * e.g. `cd astryx-app && pnpm add dayjs`. Read-only commands (`pnpm list`, `npm view`,
  * `npm run build`, `pnpm exec tsc`) do not count.
  */
-export function installsPackages(command: string): boolean {
+export function installsPackages(command: string, depth = 0): boolean {
+  // `bash -c "pnpm add x"` / `sh -c '…'`: the quoted script is a command, look inside it.
+  if (depth < 2) {
+    for (const m of command.matchAll(/\b(?:ba|z)?sh\s+(?:-\w+\s+)*-c\s+(["'])((?:\\.|(?!\1)[^\\])*)\1/g)) {
+      if (installsPackages(m[2]!, depth + 1)) return true
+    }
+  }
   // Quoted text is data (echo "… pnpm add …", commit messages), not a command.
   const bare = command.replace(/(["'])(?:\\.|(?!\1)[^\\])*\1/g, '""')
-  return /(?:^|[\s;&|(])(?:pnpm|npm|yarn|bun)\s+(?:--?[\w-]+(?:[= ]\S+)?\s+)*(?:add|install|i|ci|remove|rm|uninstall|un|update|up|upgrade)(?=\s|$|;|&|\|)/.test(bare)
+  return (
+    /(?:^|[\s;&|(])(?:pnpm|npm|yarn|bun)\s+(?:--?[\w-]+(?:[= ]\S+)?\s+)*(?:add|install|i|ci|remove|rm|uninstall|un|update|up|upgrade)(?=\s|$|;|&|\|)/.test(bare) ||
+    // A bare `yarn` (optionally with flags) installs the lockfile.
+    /(?:^|[\s;&|(])yarn(?:\s+--?[\w-]+(?:=\S+)?)*\s*(?=$|;|&|\||\))/.test(bare)
+  )
 }
 export const DEFAULT_PAGE = 'src/pages/main/page.tsx'
 
