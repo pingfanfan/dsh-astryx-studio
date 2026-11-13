@@ -1,5 +1,6 @@
 /**
- * The five Astryx tools: thin wrappers over @astryxdesign/cli/api.
+ * The five Astryx tools (thin wrappers over @astryxdesign/cli/api) and
+ * astryx_screenshot (the preview, through a Host-provided screenshot function).
  * Each returns a canonical JSON value (for PTC callers) and renders a compact
  * text view for the model.
  */

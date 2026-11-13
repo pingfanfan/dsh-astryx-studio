@@ -1,9 +1,9 @@
 /**
  * dsh-astryx-studio — Host half.
  *
- * Five Astryx tools, the verify hook (esbuild + lint synchronously, tsc in the
- * background), a stable prompt section and the bundled `astryx-page` skill.
- * The Vite preview arrives on Day 2.
+ * Five Astryx tools plus astryx_screenshot, the verify hook (esbuild + lint
+ * synchronously, tsc in the background), a stable prompt section, the bundled
+ * `astryx-page` skill, and the preview Vite behind the client's preview tab.
  */
 import { UserMessage } from "@deepseek-ai/dsh-llm";
 import Schema from "@deepseek-ai/schemastery";

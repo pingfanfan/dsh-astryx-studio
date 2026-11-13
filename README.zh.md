@@ -77,17 +77,17 @@ dsh --profile dev --no-open
 | 路径 | 内容 |
 |---|---|
 | `src/index.ts` | Host 侧：注册工具、prompt section、skill 和验证钩子 |
-| `src/tools.ts`、`src/astryx.ts` | 基于 `@astryxdesign/cli/api` 的 5 个工具 |
+| `src/tools.ts`、`src/astryx.ts` | 基于 `@astryxdesign/cli/api` 的 5 个工具，以及 `astryx_screenshot` |
 | `src/workspace.ts` | 工作区探测和内置 Vite 脚手架 |
 | `src/verify/` | esbuild 语法、lint 计数差、tsc 调度、钩子核心 |
-| `src/preview/` | `.astryx-studio/` 预览 harness、Vite 生命周期、每个会话的预览状态和运行时错误门控 |
+| `src/preview/` | `.astryx-studio/` 预览 harness、Vite 生命周期、每个会话的预览状态和运行时错误门控；`shot.ts` 驱动无头 Chrome 给 `astryx_screenshot` 截图 |
 | `src/rpc.ts`、`src/shared/` | client ↔ Host 的 RPC（`/api/astryx-studio/` 下的精确路由）和共享协议 |
 | `client/preview-tab.tsx`、`client/store.ts` | 预览 tab、工具条、页脚、持久化的工具条状态 |
 | `src/prompt.ts`、`src/generated/catalog.json` | prompt section 和 skill；catalog 在构建时从锁定版本的 CLI 生成 |
-| `client/index.tsx` | Web client 侧：`astryx-preview` tab 类型和它的 Body |
+| `client/index.tsx`、`client/gallery-tab.tsx` | Web client 侧：`astryx-preview` 和 `astryx-gallery` 两种 tab 及其 Body（中文搜索词表在 `src/shared/zh-terms.ts`） |
 | `scripts/build.mjs` | 用 tsdown 构建 `lib/index.js`（ESM）和 `lib/client.js`（ModuleLoader factory） |
 | `cordis.patch.yml` | 组合包配置层，插入 `astryx-studio` 这一行 |
-| `tests/` | 每个工具和钩子的单测、57 个模板的 lint 校准、client 冒烟测试；`ASTRYX_E2E=1` 跑真实的脚手架 → 模板 → tsc 集成测试 |
+| `tests/` | 每个工具和钩子的单测、57 个模板的 lint 校准、client 冒烟测试；`ASTRYX_E2E=1` 跑真实的脚手架 → 模板 → tsc → 预览 Vite → 无头 Chrome 集成测试 |
 
 `lib/` 随仓库提交，本地 checkout 和 git 安装都不用再跑构建。
 

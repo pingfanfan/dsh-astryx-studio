@@ -77,17 +77,17 @@ Set on the plugin row in a profile patch (`cordis.patch.yml`).
 | Path | What |
 |---|---|
 | `src/index.ts` | Host half: registers tools, prompt section, skill and the verify hooks |
-| `src/tools.ts`, `src/astryx.ts` | The five tools over `@astryxdesign/cli/api` |
+| `src/tools.ts`, `src/astryx.ts` | The five tools over `@astryxdesign/cli/api`, plus `astryx_screenshot` |
 | `src/workspace.ts` | Workspace detection and the built-in Vite scaffold |
 | `src/verify/` | esbuild syntax, lint count-diff, tsc scheduler, hook core |
-| `src/preview/` | `.astryx-studio/` harness, Vite server lifecycle, per-session preview state and runtime-error gating |
+| `src/preview/` | `.astryx-studio/` harness, Vite server lifecycle, per-session preview state and runtime-error gating; `shot.ts` drives headless Chrome for `astryx_screenshot` |
 | `src/rpc.ts`, `src/shared/` | Client ↔ Host RPC (exact routes under `/api/astryx-studio/`) and the shared protocol |
 | `client/preview-tab.tsx`, `client/store.ts` | Preview tab body, toolbar, footer, persisted toolbar state |
 | `src/prompt.ts`, `src/generated/catalog.json` | Prompt section and skill; catalog generated from the pinned CLI at build time |
-| `client/index.tsx` | Web client half: `astryx-preview` tab type and body |
+| `client/index.tsx`, `client/gallery-tab.tsx` | Web client half: `astryx-preview` and `astryx-gallery` tab types and bodies (Chinese search terms in `src/shared/zh-terms.ts`) |
 | `scripts/build.mjs` | tsdown build to `lib/index.js` (ESM) and `lib/client.js` (a ModuleLoader factory) |
 | `cordis.patch.yml` | Bundle layer that inserts the plugin row `astryx-studio` |
-| `tests/` | Unit tests per tool and hook, lint calibration over 57 templates, client smoke test; `ASTRYX_E2E=1` runs a real scaffold → template → tsc integration |
+| `tests/` | Unit tests per tool and hook, lint calibration over 57 templates, client smoke test; `ASTRYX_E2E=1` runs a real scaffold → template → tsc → preview Vite → headless-Chrome integration |
 
 `lib/` is committed so local-checkout and git installs need no build step.
 
