@@ -21,6 +21,12 @@ Found by testing 0.1.0 end to end in DSH; details and before/after runs in [docs
 - The tab reloads the iframe if a model write gets no HMR update within 4 s.
 - The gallery's "no matching templates" message sat at the bottom of an empty grid. It now sits under the toolbar, with a clear-search button.
 - A page that does not compile now shows its error in the preview, instead of "No page at …". Page paths may contain Chinese or spaces, and Windows paths work.
+- Preview server fixes from a review of its start-up and restart logic:
+  - Vite's output was scanned for the port line for its whole lifetime, re-reading an ever-growing buffer on every HMR message. Scanning now stops once Vite reports its port.
+  - A preview that failed to start revives when packages are installed from the shell, instead of staying on the old error.
+  - If the preview cannot even be set up (read-only or deleted workspace, full disk), the tab shows the error instead of an unhandled promise rejection that could reach the DSH host.
+  - A Vite crash after more than a minute of healthy running gets a fresh automatic restart. Before, any crash after the first restart was final.
+  - Approving an install right as the tab shows "needs install" now always starts it.
 - `astryx_screenshot` no longer leaks Chrome when it fails to start, and cleaning up its profile can no longer crash the Host.
 - The write check (`astryx verify`) is more accurate:
   - A file renamed with `apply_patch` is compared with its old contents, not treated as new. Operations that failed partway are still checked, since they may have written; skipped ones are not.

@@ -50,6 +50,11 @@ export interface PreviewServerOptions {
   readonly onChange?: (status: PreviewStatus) => void
 }
 
+/** Output kept for finding Vite's port line (it is short; ANSI codes included). */
+const SCAN_TAIL = 8192
+/** A Vite that ran this long before crashing gets a fresh automatic restart. */
+const HEALTHY_RUN_MS = 60_000
+
 export class PreviewServer {
   private state: PreviewStatus['state'] = 'idle'
   private url: string | undefined
@@ -58,6 +63,7 @@ export class PreviewServer {
   private proc: SpawnedProcess | undefined
   private starting: Promise<PreviewStatus> | undefined
   private restarts = 0
+  private runningSince = 0
   private stopped = false
 
   constructor(private readonly opts: PreviewServerOptions) {}
@@ -117,14 +123,18 @@ export class PreviewServer {
       return this.status()
     }
     this.proc = proc
-    let buffer = ''
+    // Scanned only until Vite reports its port: HMR keeps printing for the life of the process,
+    // and re-scanning a growing buffer on every chunk would cost memory and quadratic time.
+    let buffer: string | undefined = ''
     const ready = new Promise<number>((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error(`Vite did not report a port within ${this.opts.startTimeoutMs ?? 60_000} ms`)), this.opts.startTimeoutMs ?? 60_000)
       proc.onOutput((chunk) => {
         this.append(chunk)
-        buffer += chunk
+        if (buffer === undefined) return
+        buffer = (buffer + chunk).slice(-SCAN_TAIL)
         const found = parseVitePort(buffer)
         if (found !== undefined) {
+          buffer = undefined
           clearTimeout(timer)
           resolve(found)
         }
@@ -142,6 +152,7 @@ export class PreviewServer {
         return this.status()
       }
       this.url = `http://127.0.0.1:${actual}/`
+      this.runningSince = Date.now()
       this.set('running')
     } catch (error) {
       proc.terminate()
@@ -158,6 +169,8 @@ export class PreviewServer {
     this.proc = undefined
     this.url = undefined
     this.set('idle')
+    // A crash after a long healthy run is a new incident, not a crash loop: retry once again.
+    if (this.runningSince && Date.now() - this.runningSince > HEALTHY_RUN_MS) this.restarts = 0
     if (this.restarts < 1) {
       this.restarts++
       this.append(`[astryx-studio] Vite exited (${exit.exitCode ?? exit.signal}); restarting once`)

@@ -140,6 +140,12 @@ export class PreviewManager {
       }
       return true
     }
+    // A Vite that failed to start (or crashed twice), often for want of the package just
+    // installed: try again now rather than leave the tab on the old error.
+    if (server?.status().state === 'error') {
+      void this.ensure(workspace)
+      return true
+    }
     if (!this.stopForInstall(workspace)) return false
     void this.ensure(workspace)
     return true
@@ -180,10 +186,24 @@ export class PreviewManager {
     // and a screenshot can all ask while a minutes-long install is still running.
     const inflight = this.ensuring.get(workspace)
     if (inflight) return inflight
-    const p: Promise<PreviewStatus> = this.ensureOnce(workspace).finally(() => {
-      // Only our own entry: a restart may already have put a newer ensure in the slot.
-      if (this.ensuring.get(workspace) === p) this.ensuring.delete(workspace)
-    })
+    // The slot is cleared before `p` settles, so whoever sees its result (needs-install, an error)
+    // and asks again starts a fresh ensure instead of joining this finished one.
+    // Declared first: the finally block below compares the slot with it.
+    let p: Promise<PreviewStatus> | undefined
+    p = (async () => {
+      try {
+        return await this.ensureOnce(workspace)
+      } catch (e) {
+        // Writing the harness or reading package.json failed (read-only or deleted workspace,
+        // disk full). Callers are fire-and-forget: report it in the status, never reject.
+        const failed: PreviewStatus = { state: 'error', error: `preview setup failed: ${e instanceof Error ? e.message : String(e)}`, log: [] }
+        this.installError.set(workspace, failed)
+        return failed
+      } finally {
+        // Only our own entry: a restart may already have put a newer ensure in the slot.
+        if (this.ensuring.get(workspace) === p) this.ensuring.delete(workspace)
+      }
+    })()
     this.ensuring.set(workspace, p)
     return p
   }

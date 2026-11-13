@@ -694,3 +694,71 @@ describe('concurrency review fixes', () => {
     expect(await withInstallLock('/w', async () => 'next')).toBe('next')
   })
 })
+
+describe('preview review fixes', () => {
+  it('a crash after a long healthy run gets a fresh automatic restart', async () => {
+    const { spawn, procs } = fakeSpawner()
+    const server = new PreviewServer({ workspace: '/w', spawn, pickPort: async () => 40300 })
+    const clock = vi.spyOn(Date, 'now')
+    try {
+      clock.mockReturnValue(1_000_000)
+      const p = server.ensure()
+      await vi.waitFor(() => expect(procs).toHaveLength(1))
+      procs[0]!.emit(READY(40300))
+      await p
+      procs[0]!.exit(1) // first crash: restart once
+      await vi.waitFor(() => expect(procs).toHaveLength(2))
+      procs[1]!.emit(READY(40300))
+      await vi.waitFor(() => expect(server.status().state).toBe('running'))
+      clock.mockReturnValue(1_000_000 + 5 * 60_000) // healthy for five minutes
+      procs[1]!.exit(1)
+      await vi.waitFor(() => expect(procs).toHaveLength(3))
+      expect(server.status().state).not.toBe('error')
+    } finally {
+      clock.mockRestore()
+      server.stop()
+    }
+  })
+
+  it('finds a port line split across output chunks', async () => {
+    const { spawn, procs } = fakeSpawner()
+    const server = new PreviewServer({ workspace: '/w', spawn, pickPort: async () => 40301 })
+    const p = server.ensure()
+    await vi.waitFor(() => expect(procs).toHaveLength(1))
+    const line = READY(40301)
+    procs[0]!.emit('x'.repeat(20_000)) // noise before the banner
+    procs[0]!.emit(line.slice(0, 30))
+    procs[0]!.emit(line.slice(30))
+    expect((await p).url).toBe('http://127.0.0.1:40301/')
+    server.stop()
+  })
+
+  it('a setup failure (workspace is not a folder) is an error status, not a rejection', async () => {
+    const file = join(tempProject(), 'package.json')
+    const { spawn } = fakeSpawner()
+    const m = new PreviewManager({ run: fakeRunner().run, installTimeoutMs: 1000 })
+    m.setSpawner(spawn)
+    m.allowInstall(file)
+    const r = await m.ensure(file)
+    expect(r.state).toBe('error')
+    expect(r.error).toMatch(/preview setup failed/)
+  })
+
+  it('a shell install revives a preview that failed to start', async () => {
+    const ws = tempProject()
+    const runner = fakeRunner()
+    const { spawn, procs } = fakeSpawner()
+    const m = new PreviewManager({ run: runner.run, installTimeoutMs: 1000 })
+    m.setSpawner(spawn)
+    m.allowInstall(ws)
+    const first = m.ensure(ws)
+    await vi.waitFor(() => expect(runner.calls).toHaveLength(1))
+    runner.calls[0]!.resolve(ok())
+    await vi.waitFor(() => expect(procs).toHaveLength(1))
+    procs[0]!.exit(1) // Vite dies before it is ready
+    expect((await first).state).toBe('error')
+    expect(m.packagesInstalled(ws)).toBe(true)
+    await vi.waitFor(() => expect(runner.calls.length + procs.length).toBeGreaterThan(2))
+    m.stopAll()
+  })
+})
