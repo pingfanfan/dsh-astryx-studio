@@ -5,8 +5,8 @@
  * files to an existing project), so the plugin carries a project shaped like
  * the official apps/example-vite, pinned to the CLI's own version.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import catalog from './generated/catalog.json' with { type: 'json' }
 import type { Runner, RunResult } from './proc.js'
 import { THEMES } from './shared/preview-protocol.js'
@@ -40,16 +40,59 @@ export function isInside(dir: string, file: string): boolean {
   return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel) && !rel.startsWith(`..${sep}`))
 }
 
-/** Resolve a model-supplied path against the workspace and refuse anything outside it. */
+/**
+ * Resolve a model-supplied path against the workspace and refuse anything outside it, by text
+ * and by real path: a symlink inside the workspace must not redirect a write elsewhere.
+ */
 export function resolveInside(workspace: string, path: string): string {
   const abs = resolve(workspace, path)
   if (!isInside(workspace, abs)) throw new Error(`path ${path} is outside the Astryx workspace ${workspace}`)
+  if (existsSync(workspace)) {
+    // The deepest part that exists decides where the write really lands.
+    let probe = abs
+    while (!existsSync(probe) && dirname(probe) !== probe) probe = dirname(probe)
+    const real = join(realpathSync(probe), relative(probe, abs))
+    if (!isInside(realpathSync(workspace), real)) throw new Error(`path ${path} resolves outside the Astryx workspace ${workspace} (through a symlink)`)
+  }
   return abs
+}
+
+/**
+ * A page file the tools may write: a .tsx/.ts module under src/, not inside node_modules or a
+ * dot-folder. Returns the workspace-relative path with "/" separators.
+ */
+export function pagePathInside(workspace: string, path: string): { abs: string; rel: string } {
+  const abs = resolveInside(workspace, path)
+  const rel = toPosix(relative(workspace, abs))
+  const segments = rel.split('/')
+  if (!/^src\/.+\.tsx?$/.test(rel) || segments.some((s) => s === 'node_modules' || s.startsWith('.'))) {
+    throw new Error(`${path}: pages live under src/ as .tsx (e.g. src/pages/main/page.tsx)`)
+  }
+  return { abs, rel }
 }
 
 /** A workspace-relative path with `/` separators (page paths travel in URLs; Windows gives `\`). */
 export function toPosix(path: string): string {
   return path.split(sep).join('/')
+}
+
+/**
+ * Arguments for installing packages into a workspace the plugin may not have created: no
+ * lifecycle scripts and no .pnpmfile.cjs from that project run (pnpm already skips
+ * dependencies' build scripts by default).
+ */
+export function addArgs(pm: 'pnpm' | 'npm', specs: readonly string[]): string[] {
+  return pm === 'npm' ? ['install', '--ignore-scripts', ...specs] : ['add', '--ignore-scripts', '--ignore-pnpmfile', ...specs]
+}
+
+/** An HTML export target: a .html file inside the workspace, not in node_modules or a dot-folder. */
+export function htmlPathInside(workspace: string, path: string): string {
+  const abs = resolveInside(workspace, path)
+  const segments = toPosix(relative(workspace, abs)).split('/')
+  if (!abs.endsWith('.html') || segments.some((s) => s === 'node_modules' || s.startsWith('.'))) {
+    throw new Error(`${path}: exports are .html files in the workspace (e.g. exports/page.html)`)
+  }
+  return abs
 }
 
 export const PLACEHOLDER_PAGE = 'src/pages/main/page.tsx'

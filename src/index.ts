@@ -16,7 +16,7 @@ import type { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import type { ToolExecution, ToolRunContext } from '@deepseek-ai/dsh-tools'
 import { join, relative, resolve, sep } from 'node:path'
 import { loadAstryxApi } from './astryx.js'
-import { DEFAULT_PAGE, formatRuntimeErrors, installsPackages, PreviewManager } from './preview/manager.js'
+import { DEFAULT_PAGE, formatRuntimeErrors, installsPackages, PreviewManager, untrustedText } from './preview/manager.js'
 import { PREVIEW_DIR } from './preview/scaffold.js'
 import { captureScreenshot, findChrome } from './preview/shot.js'
 import { previewQuery, type ThemeName } from './shared/preview-protocol.js'
@@ -29,7 +29,7 @@ import { PROMPT_SECTION_NAME, PROMPT_TEXT, SKILL_REGISTRATION } from './prompt.j
 import { createTools, TOOL_NAMES, type ScreenshotArgs, type ScreenshotValue, type ToolEnv } from './tools.js'
 import { createTscScheduler } from './verify/tsc.js'
 import { isFileTool, Verifier } from './verify/verifier.js'
-import { detectWorkspace, resolveInside, toPosix } from './workspace.js'
+import { detectWorkspace, pagePathInside } from './workspace.js'
 
 export { Config }
 export const name = 'dsh-astryx-studio'
@@ -189,7 +189,7 @@ export function apply(ctx: Context, config: Partial<Config> = {}, overrides: Ove
     const cwd = await cwdOf(exec)
     const workspace = known?.workspace ?? (cwd ? detectWorkspace(cwd, cfg.appDir) : undefined)
     if (!workspace) throw new Error('no Astryx workspace here; create a page with astryx_template first')
-    const page = a.page ? toPosix(relative(workspace, resolveInside(workspace, a.page))) : (known?.page ?? DEFAULT_PAGE)
+    const page = a.page ? pagePathInside(workspace, a.page).rel : (known?.page ?? DEFAULT_PAGE)
     const chrome = findChrome(cfg.chromePath)
     if (!chrome) {
       throw new Error(
@@ -206,7 +206,7 @@ export function apply(ctx: Context, config: Partial<Config> = {}, overrides: Ove
     const name = page.replace(/^src[\\/]/, '').replace(/[\\/]/g, '_').replace(/\.tsx?$/, '')
     const out = join(workspace, PREVIEW_DIR, 'shots', `${name}-${a.width}${dark ? '-dark' : ''}.png`)
     const r = await captureScreenshot({ chrome, url: preview.url + previewQuery(page, theme, dark), width: a.width, fullPage: a.fullPage, out, signal: exec.signal })
-    return { path: r.file, file: relative(workspace, r.file), page, width: r.width, height: r.height, truncated: r.truncated, theme, dark, pageState: r.pageState, consoleErrors: r.consoleErrors }
+    return { path: r.file, file: relative(workspace, r.file), page, width: r.width, height: r.height, truncated: r.truncated, theme, dark, pageState: r.pageState, consoleErrors: r.consoleErrors.map((e) => untrustedText(e, 400)) }
   }
 
   for (const tool of createTools({

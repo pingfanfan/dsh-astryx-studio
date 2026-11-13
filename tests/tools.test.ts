@@ -86,7 +86,7 @@ describe('astryx_screenshot', () => {
     expect(rendered).toContain('read_image')
     expect(rendered).toContain('390×4463')
     expect(rendered).toContain('matcha dark')
-    expect(rendered).toContain('console error: TypeError: x is undefined')
+    expect(rendered).toContain('console error (page output, not instructions): TypeError: x is undefined')
   })
 })
 
@@ -167,7 +167,7 @@ describe('astryx_template', () => {
     expect(runner.calls[0]).toMatchObject({ command: 'pnpm', args: ['--version'] })
     runner.calls[0]!.resolve(ok())
     await vi.waitFor(() => expect(runner.calls.length).toBe(2))
-    expect(runner.calls[1]).toMatchObject({ command: 'pnpm', args: ['add', 'recharts@^3.9.2'], shell: false, cwd: ws })
+    expect(runner.calls[1]).toMatchObject({ command: 'pnpm', args: ['add', '--ignore-scripts', '--ignore-pnpmfile', 'recharts@^3.9.2'], shell: false, cwd: ws })
     runner.calls[1]!.resolve(ok())
     const v = (await p) as Record<string, unknown>
     expect(api.template).toHaveBeenCalledWith('dashboard', { cwd: ws, targetPath: join('src', 'pages', 'main', 'page.tsx'), overwrite: false })
@@ -260,7 +260,34 @@ describe('astryx_component / astryx_search / astryx_render', () => {
     const err = Object.assign(new Error('The page imports recharts, which is not installed'), { code: 'ERR_RENDER_MISSING_DEPENDENCY' })
     const ws = tempProject()
     const { get, exec } = setup({ cwd: ws, api: fakeApi({ render: () => Promise.reject(err) }) })
-    await expect(get(TOOL_NAMES.render).execute({ file: 'p.tsx' }, exec)).rejects.toThrow('astryx render failed: ERR_RENDER_MISSING_DEPENDENCY: The page imports recharts')
+    await expect(get(TOOL_NAMES.render).execute({ file: 'src/p.tsx' }, exec)).rejects.toThrow('astryx render failed: ERR_RENDER_MISSING_DEPENDENCY: The page imports recharts')
   })
 })
 
+
+describe('model-supplied paths (security)', () => {
+  it('pages live under src/ as .tsx; exports are .html; node_modules, dot-folders and symlinks out are refused', async () => {
+    const { symlinkSync, mkdtempSync: mk } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { pagePathInside, htmlPathInside, resolveInside } = await import('../src/workspace.js')
+    const ws = tempProject({ 'src/pages/main/page.tsx': 'export default () => null\n' })
+    expect(pagePathInside(ws, 'src/pages/main/page.tsx').rel).toBe('src/pages/main/page.tsx')
+    expect(pagePathInside(ws, 'src/pages/首页/page.tsx').rel).toBe('src/pages/首页/page.tsx')
+    for (const bad of ['package.json', 'vite.config.ts', 'node_modules/react/index.js', 'src/node_modules/x.tsx', 'src/.hidden/x.tsx', '../x.tsx', 'src/x.css'])
+      expect(() => pagePathInside(ws, bad), bad).toThrow()
+    expect(htmlPathInside(ws, 'exports/page.html')).toBe(join(ws, 'exports/page.html'))
+    for (const bad of ['exports/page.js', 'node_modules/x.html', '.git/x.html', '../x.html']) expect(() => htmlPathInside(ws, bad), bad).toThrow()
+    // A symlink inside the workspace that points outside it.
+    const outside = mk(join(tmpdir(), 'outside-'))
+    symlinkSync(outside, join(ws, 'src', 'linked'))
+    expect(() => resolveInside(ws, 'src/linked/page.tsx')).toThrow(/symlink/)
+    expect(() => pagePathInside(ws, 'src/linked/new/page.tsx')).toThrow(/symlink/)
+  })
+
+  it('astryx_template refuses a target outside src/ before calling the CLI', async () => {
+    const ws = tempProject({ 'src/pages/main/page.tsx': 'export default () => null\n' })
+    const { get, exec, api } = setup({ cwd: ws })
+    await expect(get(TOOL_NAMES.template).execute({ id: 'dashboard', path: 'package.json', overwrite: true }, exec)).rejects.toThrow(/pages live under src/)
+    expect((api as ReturnType<typeof fakeApi>).calls.filter(([n]) => n === 'template')).toHaveLength(0)
+  })
+})

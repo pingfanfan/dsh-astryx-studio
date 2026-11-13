@@ -62,6 +62,10 @@ export default defineConfig({
     // Transform the harness and the pages (and so @astryxdesign/core's sources) as soon as
     // Vite starts, while the tab is still opening: the first preview is ready in ~6 s, not ~12 s.
     warmup: {clientFiles: ['./main.tsx', '../src/**/*.tsx']},
+    // The harness only makes same-origin requests: no CORS (Vite's default lets any localhost
+    // page fetch the sources), and only local pages (the DSH tab) may frame the preview.
+    cors: false,
+    headers: {'Content-Security-Policy': "frame-ancestors 'self' http://127.0.0.1:* http://localhost:* http://[::1]:*"},
     // Any local page can reach a dev server: serve the harness, the page sources and
     // the installed packages only, never the rest of the workspace.
     fs: {
@@ -158,8 +162,14 @@ function retryLoad(error: unknown): number | undefined {
   return scheduledDelay;
 }
 
+// Messages (page path, errors with absolute paths) go only to a local parent: the DSH tab.
+const PARENT = (() => {
+  if (window.parent === window) return undefined;
+  const origin = (location as Location & {ancestorOrigins?: DOMStringList}).ancestorOrigins?.[0];
+  return origin && /^http:\\/\\/(127\\.0\\.0\\.1|localhost|\\[::1\\])(:\\d+)?$/.test(origin) ? origin : undefined;
+})();
 function post(message: Record<string, unknown>) {
-  window.parent?.postMessage({source: SOURCE, ...message}, '*');
+  if (PARENT) window.parent.postMessage({source: SOURCE, ...message}, PARENT);
 }
 function reportError(kind: string, error: unknown) {
   const e = error instanceof Error ? error : new Error(String(error));

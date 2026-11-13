@@ -25,6 +25,15 @@ Found by testing 0.1.0 end to end in DSH; details and before/after runs in [docs
 - Gallery thumbnails are WebP: 0.4 MB instead of 1.0 MB, so the package is about 60% smaller.
 - The first preview after a cold start is ready in about 6 s instead of about 12 s. Vite pre-transforms the harness and pages as soon as it starts (`server.warmup`).
 
+### Security
+
+Found by an independent security review; none critical.
+
+- **The preview dev server is locked down.** CORS is off, so other localhost pages can no longer read the workspace sources. Only local pages may frame the preview (`frame-ancestors`). The preview posts its messages only to a local parent, never to `*`.
+- **Installs run no project code.** Installs into a workspace run with `--ignore-scripts` (and `--ignore-pnpmfile` with pnpm), so a cloned project's lifecycle scripts or `.pnpmfile.cjs` do not run.
+- **Model-supplied paths are checked against real paths,** so a symlink in the workspace cannot redirect a write. Template and render targets must be `.tsx` under `src/`, and exports `.html`, never in `node_modules` or a dot-folder.
+- **Page output is marked as data.** Runtime errors and screenshot console errors reach the model fenced and labelled as page output, with control characters removed.
+
 ## 0.1.0 — 2026-11-08
 
 First release: five Astryx tools, the verify hook (esbuild + lint synchronously, tsc in the background), prompt section and `astryx-page` skill, the live preview tab and the template gallery.
