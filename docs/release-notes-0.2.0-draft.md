@@ -12,12 +12,14 @@
   - 模板画廊支持中文搜索。
   - `astryx_build` 和 `astryx_search` 会把中文关键词转成英文：以前中文需求全部落到同一个不相干的模板，中文搜索结果都是 0 条。
   - 新建项目默认显示中文组件文案（必填/可选、日期）。
+- **写入检查更准。** `astryx verify` 只数代码（注释里的 `<div>` 不算），用 `apply_patch` 改名的文件和改名前的内容比较，主 agent 和子 agent 都能收到各自的 tsc 结论，新的写入之后不会再拿到过时的结论。
 - **更快、更小。** 冷启动后的首次预览从约 12 秒降到约 6 秒，安装包从 1.1 MB 降到约 0.5 MB。
 - **更安全。** 一次独立安全审查发现的问题已全部修复：
   - 预览服务器关闭跨域访问，只允许本机页面嵌入；
   - 往别人的项目里装依赖前会先询问，安装时不运行项目自带的脚本；
   - 路径按真实路径检查；
   - 页面报错以「数据」而不是「指令」的形式交给模型。
+- **依赖审计无已知漏洞。** `pnpm audit` 报出的 `zod`、`undici` 漏洞都已处理；插件用户本来就不受影响。
 
 ## 新选项
 
@@ -26,7 +28,7 @@
 
 ## 已知限制
 
-- Windows 未实测：已按 Windows 的方式启动 `pnpm`、Vite 和 tsc（经 `cmd.exe` 或 `node`），命令行有单元测试，但没在 Windows 上跑过。
+- Windows 未实测：已按 Windows 的方式启动 `pnpm`、Vite 和 tsc（经 `cmd.exe` 或 `node`），超时或取消时用 `taskkill /T /F` 结束整个进程树。这些命令行有单元测试，但没在 Windows 上跑过。
 - 「在 web-review 打开」按钮还没在装了 web-review 的环境里测过。
 - 所有实测都在 DSH 网页版（`dev` profile）里做的。DSH 桌面 app 的界面运行在 `dsh-app://app`，预览的安全策略已经放行它，但没有在桌面 app 里实测。
 
@@ -48,12 +50,14 @@ This release comes from an end-to-end test of 0.1.0: building pages in DeepSeek 
   - The gallery searches in Chinese.
   - `astryx_build` and `astryx_search` map Chinese keywords to English. Before, every Chinese request landed on the same unrelated template, and every Chinese search returned nothing.
   - New projects show Chinese built-in component text (必填/可选, dates).
+- **A more accurate write check.** `astryx verify` counts code only (a `<div>` in a comment does not count), compares a file renamed with `apply_patch` with its old contents, gives the parent agent and each subagent their own tsc verdict, and never hands out a verdict older than the latest write.
 - **Faster and smaller.** The first preview after a cold start is ready in about 6 s instead of about 12 s. The package is about 0.5 MB instead of 1.1 MB.
 - **Safer.** Everything an independent security review found is fixed:
   - the preview server has CORS off and allows only local framing;
   - installs into other people's projects need approval and never run the project's scripts;
   - paths are checked against real paths;
   - page errors reach the model as data, not instructions.
+- **A clean dependency audit.** The `zod` and `undici` advisories `pnpm audit` reported are handled; plugin users were not affected.
 
 ## New options
 
@@ -62,7 +66,7 @@ This release comes from an end-to-end test of 0.1.0: building pages in DeepSeek 
 
 ## Known limitations
 
-- Windows is untested: `pnpm`, Vite and tsc are launched the Windows way (through `cmd.exe`, or with `node`). The command lines are unit-tested but have not run on Windows.
+- Windows is untested: `pnpm`, Vite and tsc are launched the Windows way (through `cmd.exe`, or with `node`). A timeout or cancel stops the whole process tree with `taskkill /T /F`. The command lines are unit-tested but have not run on Windows.
 - The "在 web-review 打开" button is untested with web-review installed.
 - All testing was in the DSH web UI (`dev` profile). The DSH desktop app's UI runs on `dsh-app://app`; the preview's CSP allows it, but it is untested in the desktop app.
 
