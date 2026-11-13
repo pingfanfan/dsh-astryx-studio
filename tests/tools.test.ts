@@ -197,7 +197,8 @@ describe('astryx_template', () => {
     await vi.waitFor(() => expect(runner.calls.length).toBeGreaterThan(0))
     runner.calls[0]!.resolve(ok()) // pnpm --version
     await vi.waitFor(() => expect(runner.calls.length).toBe(2))
-    expect(runner.calls[1]).toMatchObject({ command: 'pnpm', args: ['install'], cwd: join(cwd, 'astryx-app') })
+    // Its own root: a parent pnpm workspace's pnpmfile, scripts and lockfile stay out of it.
+    expect(runner.calls[1]).toMatchObject({ command: 'pnpm', args: ['install', '--ignore-workspace', '--ignore-pnpmfile'], cwd: join(cwd, 'astryx-app') })
     runner.calls[1]!.resolve(ok())
     const v = (await p) as Record<string, unknown>
     expect(v.scaffolded).toBe(true)
@@ -225,6 +226,13 @@ describe('astryx_template', () => {
     const cwd = tempProject({ 'astryx-app/package.json': '{"name":"mine"}' }, false)
     const { get, exec } = setup({ cwd })
     await expect(get(TOOL_NAMES.template).execute({ id: 'login' }, exec)).rejects.toThrow(/refusing to overwrite/)
+  })
+
+  it('refuses to scaffold into a folder that already has files (no package.json)', async () => {
+    const cwd = tempProject({ 'astryx-app/index.html': '<!-- mine -->' }, false)
+    const { get, exec } = setup({ cwd })
+    await expect(get(TOOL_NAMES.template).execute({ id: 'login' }, exec)).rejects.toThrow(/already has files/)
+    expect(readFileSync(join(cwd, 'astryx-app/index.html'), 'utf8')).toBe('<!-- mine -->')
   })
 })
 

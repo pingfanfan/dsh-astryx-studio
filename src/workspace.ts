@@ -5,7 +5,7 @@
  * files to an existing project), so the plugin carries a project shaped like
  * the official apps/example-vite, pinned to the CLI's own version.
  */
-import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import catalog from './generated/catalog.json' with { type: 'json' }
 import type { Runner, RunResult } from './proc.js'
@@ -319,14 +319,21 @@ export async function scaffold(
   if (existsSync(join(dir, 'package.json'))) {
     throw new Error(`${dir} already has a package.json that does not depend on @astryxdesign/core; refusing to overwrite it`)
   }
+  // Only into a new or empty folder: an earlier attempt or a copied folder may hold the user's own
+  // index.html, vite.config.ts or src/, and a symlink inside it could redirect a write elsewhere.
+  if (lexists(dir) && readdirSync(dir).some((n) => n !== '.DS_Store')) {
+    throw new Error(`${dir} already has files but is not an Astryx project; refusing to write the scaffold over them (empty it or choose another folder)`)
+  }
   const files = scaffoldFiles(dir.split(sep).pop() || 'astryx-app', options.locale ?? '')
   for (const [rel, text] of Object.entries(files)) {
     const file = join(dir, rel)
     mkdirSync(resolve(file, '..'), { recursive: true })
-    writeFileSync(file, text)
+    writeFileSync(file, text, { flag: 'wx' })
   }
   const pm = await pickPackageManager(options.packageManager, options.run, dir)
-  const install = await options.run(pm, ['install'], {
+  // The new app is its own root: inside a parent pnpm workspace, a plain install would run the
+  // parent's .pnpmfile.cjs and root scripts and rewrite its lockfile.
+  const install = await options.run(pm, pm === 'pnpm' ? ['install', '--ignore-workspace', '--ignore-pnpmfile'] : ['install'], {
     cwd: dir,
     timeoutMs: options.timeoutMs,
     signal: options.signal,
