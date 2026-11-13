@@ -1,3 +1,5 @@
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { launch, packageBin, quoteWindowsArg } from '../src/platform.js'
@@ -42,9 +44,14 @@ describe('launching on Windows (command lines only; not run on Windows yet)', ()
   it('runs vite and tsc from their JavaScript entries with node (no .cmd shim)', () => {
     expect(packageBin('C:\\w', 'vite', 'win32')).toEqual(['node', join('C:\\w', 'node_modules', 'vite', 'bin', 'vite.js')])
     expect(packageBin('C:\\w', 'tsc', 'win32')).toEqual(['node', join('C:\\w', 'node_modules', 'typescript', 'bin', 'tsc')])
-    const t = tscArgs('C:\\w', 'win32')
+    // tsc: the workspace's own TypeScript when it has one, else a global tsc.
+    expect(tscArgs('C:\\no-such-workspace', 'win32').command).toBe('tsc')
+    const ws = mkdtempSync(join(tmpdir(), 'ts-'))
+    mkdirSync(join(ws, 'node_modules', 'typescript', 'bin'), { recursive: true })
+    writeFileSync(join(ws, 'node_modules', 'typescript', 'bin', 'tsc'), '')
+    const t = tscArgs(ws, 'win32')
     expect(t.command).toBe('node')
-    expect(t.args[0]).toBe(join('C:\\w', 'node_modules', 'typescript', 'bin', 'tsc'))
+    expect(t.args[0]).toBe(join(ws, 'node_modules', 'typescript', 'bin', 'tsc'))
     expect(t.args).toContain('--noEmit')
   })
 })

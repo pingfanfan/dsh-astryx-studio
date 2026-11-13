@@ -57,6 +57,10 @@ export class PreviewManager {
   private readonly verify = new Map<string, VerifyStatus>()
   /** Projects whose preview-package install the user approved in the tab (this Host run). */
   private readonly installApproved = new Set<string>()
+  /** In-flight ensure() per workspace (one install / start at a time). */
+  private readonly ensuring = new Map<string, Promise<PreviewStatus>>()
+  /** The last failed preview-package install per workspace, shown by status(). */
+  private readonly installError = new Map<string, PreviewStatus>()
   /** Projects waiting for that approval, with the packages they lack. */
   private readonly installPending = new Map<string, string[]>()
   /** Workspaces whose Vite restarts once its current start finishes (an install landed meanwhile). */
@@ -138,6 +142,9 @@ export class PreviewManager {
     const server = this.servers.get(workspace)
     if (server?.status().state !== 'running') return false
     server.stop()
+    // An ensure() still settling now only reports the server just stopped: the restart must not
+    // join it (it would return "running" for the old process and start nothing).
+    this.ensuring.delete(workspace)
     return true
   }
 
@@ -161,7 +168,18 @@ export class PreviewManager {
 
   /** Start (or reuse) the preview server for a workspace, writing the harness and installing what it needs. */
   async ensure(workspace: string): Promise<PreviewStatus> {
+    // One start (and so one install) per workspace at a time: the tab's button, a template write
+    // and a screenshot can all ask while a minutes-long install is still running.
+    const inflight = this.ensuring.get(workspace)
+    if (inflight) return inflight
+    const p = this.ensureOnce(workspace).finally(() => this.ensuring.delete(workspace))
+    this.ensuring.set(workspace, p)
+    return p
+  }
+
+  private async ensureOnce(workspace: string): Promise<PreviewStatus> {
     if (!this.spawner) return { state: 'unavailable', error: 'ctx.subprocess is not available in this profile', log: [] }
+    this.installError.delete(workspace)
     let server = this.servers.get(workspace)
     if (!server) {
       const spawner = this.spawner
@@ -182,7 +200,12 @@ export class PreviewManager {
       const r = await this.opts.run('pnpm', addArgs('pnpm', missing.map(installSpec)), { cwd: workspace, timeoutMs: this.opts.installTimeoutMs })
       if (r.code !== 0) {
         const npm = await this.opts.run('npm', addArgs('npm', missing.map(installSpec)), { cwd: workspace, timeoutMs: this.opts.installTimeoutMs })
-        if (npm.code !== 0) return { state: 'error', error: `installing ${missing.join(', ')} failed: ${(npm.stderr || r.stderr).slice(-400)}`, log: [] }
+        if (npm.code !== 0) {
+          // Kept for status(): the server never started, so it would otherwise just say "idle".
+          const failed: PreviewStatus = { state: 'error', error: `installing ${missing.join(', ')} failed: ${(npm.stderr || r.stderr).slice(-400)}`, log: [] }
+          this.installError.set(workspace, failed)
+          return failed
+        }
       }
     }
     return server.ensure()
@@ -225,12 +248,22 @@ export class PreviewManager {
   status(sessionId: string): SessionStatus {
     const s = this.session(sessionId)
     const server = s.workspace ? this.servers.get(s.workspace) : undefined
-    const pending = s.workspace ? this.installPending.get(s.workspace) : undefined
+    let pending = s.workspace ? this.installPending.get(s.workspace) : undefined
+    if (pending && s.workspace && missingPreviewPackages(s.workspace).length === 0) {
+      // The packages arrived another way (a shell install): drop the prompt and start.
+      this.installPending.delete(s.workspace)
+      pending = undefined
+      void this.ensure(s.workspace)
+    }
+    const running = server?.status().state === 'running'
+    const failed = s.workspace ? this.installError.get(s.workspace) : undefined
     const preview: PreviewStatus = !this.spawner
       ? { state: 'unavailable', error: 'ctx.subprocess is not available in this profile', log: [] }
-      : pending && server?.status().state !== 'running'
+      : pending && !running
         ? { state: 'needs-install', missing: pending, log: [] }
-        : (server?.status() ?? { state: 'idle', log: [] })
+        : failed && !running
+          ? failed
+          : (server?.status() ?? { state: 'idle', log: [] })
     return {
       ...(s.workspace ? { workspace: s.workspace } : {}),
       ...(s.page ? { page: s.page } : {}),

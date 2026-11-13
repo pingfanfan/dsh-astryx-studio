@@ -159,7 +159,10 @@ export function englishKeywords(keywords: string): string {
       words.push(w)
       continue
     }
-    for (const group of expandSearchWord(w)) if (group.length > 1) words.push(group[1]!)
+    for (const group of expandSearchWord(w)) {
+      if (group.length > 1) words.push(group[1]!)
+      else if (!/[\u3400-\u9fff]/.test(group[0]!)) words.push(group[0]!) // the English part of a mixed word (login表单)
+    }
   }
   const unique = [...new Set(words)]
   return unique.length > 0 ? unique.join(' ') : keywords

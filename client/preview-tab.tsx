@@ -241,7 +241,7 @@ export function emptyText(status: SessionStatus | undefined, rpcError: string | 
   if (status.preview.state === 'error') return `预览启动失败：${status.preview.error ?? ''}\n${status.preview.log.slice(-8).join('\n')}`
   if (status.preview.state === 'unavailable') return `当前 profile 无法启动预览：${status.preview.error ?? ''}`
   if (status.preview.state === 'needs-install')
-    return `这个项目不是插件创建的，预览还缺这些依赖：${(status.preview.missing ?? []).join('、')}。安装会把它们加进项目的 package.json（不运行项目的安装脚本）。`
+    return `预览还缺这些依赖：${(status.preview.missing ?? []).join('、')}（这个项目可能不是插件创建的，或者依赖还没装好）。安装会把它们加进项目的 package.json，不运行项目的安装脚本。`
   return '正在启动预览（Vite）…'
 }
 

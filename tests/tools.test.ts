@@ -291,3 +291,19 @@ describe('model-supplied paths (security)', () => {
     expect((api as ReturnType<typeof fakeApi>).calls.filter(([n]) => n === 'template')).toHaveLength(0)
   })
 })
+
+describe('third review fixes (tools)', () => {
+  it('a dangling symlink inside the workspace is refused, not followed', async () => {
+    const { symlinkSync } = await import('node:fs')
+    const { resolveInside, pagePathInside } = await import('../src/workspace.js')
+    const ws = tempProject({ 'src/pages/main/page.tsx': 'export default () => null\n' })
+    symlinkSync('/nonexistent-astryx-target/evil.tsx', join(ws, 'src', 'pages', 'x.tsx'))
+    expect(() => resolveInside(ws, 'src/pages/x.tsx')).toThrow(/broken symlink/)
+    expect(() => pagePathInside(ws, 'src/pages/x.tsx')).toThrow(/broken symlink/)
+  })
+
+  it('englishKeywords keeps the English part of a mixed word', () => {
+    expect(englishKeywords('login表单')).toBe('login form')
+    expect(englishKeywords('表格tree')).toBe('table tree')
+  })
+})

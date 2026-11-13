@@ -574,3 +574,55 @@ describe('install consent for projects the plugin did not create', () => {
     expect(calls).toEqual(['s9'])
   })
 })
+
+describe('third review fixes', () => {
+  function bare() {
+    const runner = fakeRunner()
+    const procs: string[][] = []
+    const m = new PreviewManager({ run: runner.run, installTimeoutMs: 1000 })
+    m.setSpawner((argv) => (procs.push([...argv]), { onOutput: () => undefined, done: new Promise(() => undefined), terminate: () => undefined }))
+    return { m, runner, procs }
+  }
+
+  it('a failed approved install shows as an error, not an endless "starting"', async () => {
+    const ws = tempProject({ 'src/pages/main/page.tsx': 'export default () => null\n' })
+    const { m, runner } = bare()
+    m.templateWritten('s1', ws, 'src/pages/main/page.tsx')
+    await vi.waitFor(() => expect(m.status('s1').preview.state).toBe('needs-install'))
+    const done = m.approveInstall('s1')
+    await vi.waitFor(() => expect(runner.calls).toHaveLength(1))
+    runner.calls[0]!.resolve({ ...ok(), code: 1, stderr: 'pnpm: network down' })
+    await vi.waitFor(() => expect(runner.calls).toHaveLength(2))
+    runner.calls[1]!.resolve({ ...ok(), code: 1, stderr: 'npm ERR! network down' })
+    expect((await done).preview).toMatchObject({ state: 'error' })
+    expect(m.status('s1').preview.state).toBe('error')
+    expect(m.status('s1').preview.error).toContain('network down')
+  })
+
+  it('concurrent ensure() calls share one install', async () => {
+    const ws = tempProject()
+    const { m, runner } = bare()
+    m.allowInstall(ws)
+    void m.ensure(ws)
+    void m.ensure(ws) // e.g. the tab button while a template write starts the preview
+    await vi.waitFor(() => expect(runner.calls).toHaveLength(1))
+    await tick()
+    expect(runner.calls).toHaveLength(1)
+    runner.calls[0]!.resolve(ok())
+    m.stopAll()
+  })
+
+  it('needs-install clears by itself once the packages arrive another way, and the preview starts', async () => {
+    const ws = tempProject({ 'src/pages/main/page.tsx': 'export default () => null\n' })
+    const { m, procs } = bare()
+    m.templateWritten('s1', ws, 'src/pages/main/page.tsx')
+    await vi.waitFor(() => expect(m.status('s1').preview.state).toBe('needs-install'))
+    for (const pkg of missingPreviewPackages(ws)) {
+      mkdirSync(join(ws, 'node_modules', pkg), { recursive: true })
+      writeFileSync(join(ws, 'node_modules', pkg, 'package.json'), '{}')
+    }
+    expect(m.status('s1').preview.state).not.toBe('needs-install')
+    await vi.waitFor(() => expect(procs).toHaveLength(1))
+    m.stopAll()
+  })
+})

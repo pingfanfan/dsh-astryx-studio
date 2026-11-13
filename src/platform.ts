@@ -10,6 +10,9 @@
  *
  * Everything here is a no-op on macOS and Linux. NOT YET RUN ON WINDOWS: the
  * command lines are unit-tested only.
+ *
+ * Known limit (same as cross-spawn): a timeout or abort kills cmd.exe, not the
+ * pnpm / npm process tree under it; that would need `taskkill /T /F`.
  */
 import { join } from 'node:path'
 

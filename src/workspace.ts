@@ -5,7 +5,7 @@
  * files to an existing project), so the plugin carries a project shaped like
  * the official apps/example-vite, pinned to the CLI's own version.
  */
-import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import catalog from './generated/catalog.json' with { type: 'json' }
 import type { Runner, RunResult } from './proc.js'
@@ -34,6 +34,15 @@ export function detectWorkspace(cwd: string, appDir: string): string | undefined
   return isAstryxProject(app) ? app : undefined
 }
 
+function lexists(path: string): boolean {
+  try {
+    lstatSync(path)
+    return true
+  } catch {
+    return false
+  }
+}
+
 /** Whether `file` lies inside `dir` (both absolute). */
 export function isInside(dir: string, file: string): boolean {
   const rel = relative(dir, file)
@@ -48,10 +57,16 @@ export function resolveInside(workspace: string, path: string): string {
   const abs = resolve(workspace, path)
   if (!isInside(workspace, abs)) throw new Error(`path ${path} is outside the Astryx workspace ${workspace}`)
   if (existsSync(workspace)) {
-    // The deepest part that exists decides where the write really lands.
+    // The deepest entry that exists (a dangling symlink counts: lstat) decides where the write
+    // really lands. realpath of a dangling link throws: refuse it rather than follow it blind.
     let probe = abs
-    while (!existsSync(probe) && dirname(probe) !== probe) probe = dirname(probe)
-    const real = join(realpathSync(probe), relative(probe, abs))
+    while (!lexists(probe) && dirname(probe) !== probe) probe = dirname(probe)
+    let real: string
+    try {
+      real = join(realpathSync(probe), relative(probe, abs))
+    } catch {
+      throw new Error(`path ${path} goes through a broken symlink in the Astryx workspace ${workspace}`)
+    }
     if (!isInside(realpathSync(workspace), real)) throw new Error(`path ${path} resolves outside the Astryx workspace ${workspace} (through a symlink)`)
   }
   return abs

@@ -44,7 +44,9 @@ export function tscArgs(workspace: string, platform: NodeJS.Platform = process.p
   const local = join(workspace, 'node_modules', '.bin', 'tsc')
   const project = existsSync(join(workspace, 'tsconfig.app.json')) ? 'tsconfig.app.json' : 'tsconfig.json'
   // The workspace's own TypeScript: .bin/tsc, or `node typescript/bin/tsc` on Windows (no .cmd shim).
-  const [command, ...pre] = existsSync(local) || platform === 'win32' ? packageBin(workspace, 'tsc', platform) : ['tsc']
+  // On Windows .bin holds only a .cmd shim, so look for the JavaScript entry instead.
+  const hasLocal = platform === 'win32' ? existsSync(join(workspace, 'node_modules', 'typescript', 'bin', 'tsc')) : existsSync(local)
+  const [command, ...pre] = hasLocal ? packageBin(workspace, 'tsc', platform) : ['tsc']
   return {
     command: command!,
     args: [

@@ -258,7 +258,7 @@ export function apply(ctx: Context, config: Partial<Config> = {}, overrides: Ove
         if (decision.kind !== 'allow') return decision
         return {
           kind: 'ask',
-          reason: `astryx_template will write a page into ${workspace} (a project the plugin did not create) and may add the template's packages to its package.json`,
+          reason: `astryx_template will write a page into ${workspace} (it lacks the preview packages: not created by the plugin, or not installed yet) and may add the template's packages to its package.json`,
           displayReason: {
             en: 'Write an Astryx template into this project? It may add the template\'s packages to package.json.',
             zh: '把 Astryx 模板写进这个项目？可能会往 package.json 添加模板需要的依赖。',
