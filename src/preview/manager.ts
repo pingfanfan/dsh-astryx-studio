@@ -199,6 +199,11 @@ export class PreviewManager {
     return this.status(sessionId)
   }
 
+  /** Whether the user approved package changes in `workspace` (see allowInstall). */
+  isInstallApproved(workspace: string): boolean {
+    return this.installApproved.has(workspace)
+  }
+
   /** Allow preview-package installs into `workspace` without asking (approval, or tests). */
   allowInstall(workspace: string): void {
     this.installApproved.add(workspace)

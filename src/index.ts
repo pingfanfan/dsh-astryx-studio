@@ -17,7 +17,7 @@ import type { ToolExecution, ToolRunContext } from '@deepseek-ai/dsh-tools'
 import { join, relative, resolve, sep } from 'node:path'
 import { loadAstryxApi } from './astryx.js'
 import { DEFAULT_PAGE, formatRuntimeErrors, installsPackages, PreviewManager, untrustedText } from './preview/manager.js'
-import { PREVIEW_DIR } from './preview/scaffold.js'
+import { missingPreviewPackages, PREVIEW_DIR } from './preview/scaffold.js'
 import { captureScreenshot, findChrome } from './preview/shot.js'
 import { previewQuery, type ThemeName } from './shared/preview-protocol.js'
 import type { Spawner } from './preview/server.js'
@@ -246,6 +246,22 @@ export function apply(ctx: Context, config: Partial<Config> = {}, overrides: Ove
           displayReason: {
             en: `Create an Astryx project in ./${cfg.appDir} and install its dependencies?`,
             zh: `在 ./${cfg.appDir} 新建 Astryx 项目并安装依赖？`,
+          },
+        }
+      }
+      // A project the plugin did not create (it still lacks the preview packages, and the user has
+      // not approved package changes in the tab): writing a template may add its packages to the
+      // project's package.json, so ask first.
+      const workspace = cwd ? detectWorkspace(cwd, cfg.appDir) : undefined
+      if (workspace && missingPreviewPackages(workspace).length > 0 && !manager.isInstallApproved(workspace)) {
+        const decision = await next()
+        if (decision.kind !== 'allow') return decision
+        return {
+          kind: 'ask',
+          reason: `astryx_template will write a page into ${workspace} (a project the plugin did not create) and may add the template's packages to its package.json`,
+          displayReason: {
+            en: 'Write an Astryx template into this project? It may add the template\'s packages to package.json.',
+            zh: '把 Astryx 模板写进这个项目？可能会往 package.json 添加模板需要的依赖。',
           },
         }
       }

@@ -1,4 +1,4 @@
-import { writeFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { apply, inject, MESSAGE_SOURCE } from '../src/index.js'
@@ -97,13 +97,30 @@ describe('tools/pre-execute', () => {
     expect(d.displayReason.zh).toContain('astryx-app')
   })
 
-  it('does not ask when a workspace exists, and keeps an upstream deny', async () => {
-    const f = boot(tempProject())
+  it('does not ask in a project that has the preview packages (scaffolded), and keeps an upstream deny', async () => {
+    const { missingPreviewPackages } = await import('../src/preview/scaffold.js')
+    const ws = tempProject()
+    for (const pkg of missingPreviewPackages(ws)) {
+      mkdirSync(join(ws, 'node_modules', pkg), { recursive: true })
+      writeFileSync(join(ws, 'node_modules', pkg, 'package.json'), '{}')
+    }
+    const f = boot(ws)
     const pre = f.handlers.get('tools/pre-execute')!
     const exec = { name: 'astryx_template', callId: 'c', arguments: {}, agent, signal: new AbortController().signal }
     expect(await pre(exec, async () => ({ kind: 'allow' }))).toEqual({ kind: 'allow' })
     const g = boot(tempProject({}, false))
     expect(await g.handlers.get('tools/pre-execute')!(exec, async () => ({ kind: 'deny', reason: 'policy' }))).toEqual({ kind: 'deny', reason: 'policy' })
+  })
+})
+
+describe('tools/pre-execute in a project the plugin did not create', () => {
+  it('asks before astryx_template writes there (it may add packages to package.json)', async () => {
+    const f = boot(tempProject())
+    const exec = { name: 'astryx_template', callId: 'c', arguments: {}, agent, signal: new AbortController().signal }
+    const d = await f.handlers.get('tools/pre-execute')!(exec, async () => ({ kind: 'allow' }))
+    expect(d.kind).toBe('ask')
+    expect(d.displayReason.zh).toContain('package.json')
+    expect(await f.handlers.get('tools/pre-execute')!(exec, async () => ({ kind: 'deny', reason: 'policy' }))).toEqual({ kind: 'deny', reason: 'policy' })
   })
 })
 
