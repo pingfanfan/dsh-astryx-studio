@@ -4,6 +4,7 @@
  * reports nothing. Only the newest completed result is kept for injection.
  */
 import { existsSync, mkdirSync } from 'node:fs'
+import { packageBin } from '../platform.js'
 import { join, relative } from 'node:path'
 import type { Runner } from '../proc.js'
 
@@ -39,12 +40,15 @@ export function parseTscOutput(output: string, workspace: string): TscDiagnostic
   return out
 }
 
-export function tscArgs(workspace: string): { command: string; args: string[] } {
+export function tscArgs(workspace: string, platform: NodeJS.Platform = process.platform): { command: string; args: string[] } {
   const local = join(workspace, 'node_modules', '.bin', 'tsc')
   const project = existsSync(join(workspace, 'tsconfig.app.json')) ? 'tsconfig.app.json' : 'tsconfig.json'
+  // The workspace's own TypeScript: .bin/tsc, or `node typescript/bin/tsc` on Windows (no .cmd shim).
+  const [command, ...pre] = existsSync(local) || platform === 'win32' ? packageBin(workspace, 'tsc', platform) : ['tsc']
   return {
-    command: existsSync(local) ? local : 'tsc',
+    command: command!,
     args: [
+      ...pre,
       '--noEmit',
       '--incremental',
       '--tsBuildInfoFile',

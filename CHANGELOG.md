@@ -23,6 +23,8 @@ Found by testing 0.1.0 end to end in DSH; details and before/after runs in [docs
 - A page that does not compile now shows its error in the preview, instead of "No page at …". Page paths may contain Chinese or spaces, and Windows paths work.
 - `astryx_screenshot` no longer leaks Chrome when it fails to start, and cleaning up its profile can no longer crash the Host.
 
+- Windows: `pnpm`/`npm` run through `cmd.exe` with quoted arguments, and Vite and tsc run from their JavaScript entries with `node`, because Node cannot spawn `.cmd` shims directly. Unit-tested only; not yet run on Windows.
+
 ### Performance
 
 - The first preview after a cold start is ready in about 6 s instead of about 12 s. Vite pre-transforms the harness and pages as soon as it starts (`server.warmup`).

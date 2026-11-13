@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { launch } from './platform.js'
 
 export interface RunResult {
   readonly code: number | null
@@ -23,9 +24,12 @@ export type Runner = (command: string, args: readonly string[], options: RunOpti
 export const runProcess: Runner = (command, args, options) =>
   new Promise((resolvePromise, reject) => {
     const started = Date.now()
-    const child = spawn(command, args as string[], {
+    // Windows: a bare pnpm / npm is a .cmd shim and goes through cmd.exe (see platform.ts).
+    const l = options.shell ? { command, args: [...args] } : launch(command, args)
+    const child = spawn(l.command, l.args, {
       cwd: options.cwd,
       shell: options.shell ?? false,
+      ...(l.windowsVerbatimArguments ? { windowsVerbatimArguments: true } : {}),
       env: { ...process.env, CI: '1', FORCE_COLOR: '0' },
       stdio: ['ignore', 'pipe', 'pipe'],
     })

@@ -6,6 +6,7 @@
 import { createServer } from 'node:net'
 import { join } from 'node:path'
 import type { PreviewStatus } from '../shared/preview-protocol.js'
+import { packageBin } from '../platform.js'
 import { PREVIEW_DIR } from './scaffold.js'
 
 /** The slice of a spawned process the server needs (adapted from SubprocessHandle). */
@@ -103,8 +104,8 @@ export class PreviewServer {
   private async start(): Promise<PreviewStatus> {
     this.set('starting')
     const port = await (this.opts.pickPort ?? freePort)()
-    const vite = join(this.opts.workspace, 'node_modules', '.bin', 'vite')
-    const argv = [vite, '--config', join(PREVIEW_DIR, 'vite.config.ts'), '--host', '127.0.0.1', '--port', String(port), '--strictPort']
+    // node_modules/.bin/vite, or `node vite/bin/vite.js` on Windows (no .cmd shim).
+    const argv = [...packageBin(this.opts.workspace, 'vite'), '--config', join(PREVIEW_DIR, 'vite.config.ts'), '--host', '127.0.0.1', '--port', String(port), '--strictPort']
     const proc = this.opts.spawn(argv, this.opts.workspace)
     this.proc = proc
     let buffer = ''
