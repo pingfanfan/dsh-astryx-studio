@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Astryx Studio",
-    "description": "用 Meta 的 Astryx 设计系统构建页面：agent 先选页面模板再修改，每次写入都检查语法、lint 和类型；右侧 Sidebar 提供实时预览和模板画廊。",
+    "description": "用 Meta 的 Astryx 设计系统构建页面：agent 先选页面模板再修改，每次写入都检查语法、lint 和类型；右侧 Sidebar 提供实时预览（agent 可按任意宽度截图查看）和支持中文搜索的模板画廊。",
     "detail": "docs/DETAIL.zh.md"
   },
   "tab": {

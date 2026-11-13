@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Astryx Studio",
-    "description": "Build pages with Meta's Astryx design system: the agent picks a page template, adapts it, and every write is checked for syntax, lint and types, with a live preview tab and a template gallery in the right sidebar.",
+    "description": "Build pages with Meta's Astryx design system: the agent picks a page template, adapts it, and every write is checked for syntax, lint and types. A live preview tab the agent can screenshot at any width, and a template gallery searchable in Chinese, sit in the right sidebar.",
     "detail": "docs/DETAIL.md"
   },
   "tab": {
