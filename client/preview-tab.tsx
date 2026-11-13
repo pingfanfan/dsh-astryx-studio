@@ -143,6 +143,14 @@ export function PreviewView(props: PreviewFace) {
   }, [call, sessionId, sendPrefs])
 
   const fullUrl = status?.preview.url && status.page ? status.preview.url + previewQuery(status.page, p.theme, p.dark) : undefined
+  const [installing, setInstalling] = useState(false)
+  const install = async () => {
+    setInstalling(true)
+    const r = await call('installPreview', { sessionId }).catch((e: unknown) => ({ ok: false as const, error: { code: 'RPC', message: String(e) } }))
+    setInstalling(false)
+    if (r.ok) setStatus(r.value as SessionStatus)
+    else setRpcError(r.error.message)
+  }
   const exportHtml = async () => {
     setNotice('导出中…')
     const r = await call('exportHtml', { sessionId })
@@ -206,7 +214,16 @@ export function PreviewView(props: PreviewFace) {
             style={{ ...S.frame, width: width === null ? '100%' : `${width}px` }}
           />
         ) : (
-          <div style={S.empty}>{emptyText(status, rpcError)}</div>
+          <div style={S.empty}>
+            {emptyText(status, rpcError)}
+            {status?.preview.state === 'needs-install' ? (
+              <div style={{ marginTop: 10 }}>
+                <button type="button" style={btn(false)} disabled={installing} onClick={() => void install()}>
+                  {installing ? '正在安装…' : `安装 ${status.preview.missing?.length ?? 0} 个预览依赖`}
+                </button>
+              </div>
+            ) : null}
+          </div>
         )}
       </div>
       <div style={S.footer}>
@@ -223,6 +240,8 @@ export function emptyText(status: SessionStatus | undefined, rpcError: string | 
   if (!status.page) return '还没有页面。让模型用 astryx_template 创建一个页面后，这里会自动显示预览。'
   if (status.preview.state === 'error') return `预览启动失败：${status.preview.error ?? ''}\n${status.preview.log.slice(-8).join('\n')}`
   if (status.preview.state === 'unavailable') return `当前 profile 无法启动预览：${status.preview.error ?? ''}`
+  if (status.preview.state === 'needs-install')
+    return `这个项目不是插件创建的，预览还缺这些依赖：${(status.preview.missing ?? []).join('、')}。安装会把它们加进项目的 package.json（不运行项目的安装脚本）。`
   return '正在启动预览（Vite）…'
 }
 
@@ -236,6 +255,8 @@ export function viteText(status: SessionStatus | undefined): string {
       return '出错'
     case 'unavailable':
       return '不可用'
+    case 'needs-install':
+      return '等待安装预览依赖'
     default:
       return '未启动'
   }

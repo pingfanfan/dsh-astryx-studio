@@ -212,6 +212,7 @@ describe('preview manager', () => {
   it('templateWritten records the page, bumps openSeq, writes the harness, installs missing themes, starts Vite', async () => {
     const ws = tempProject()
     const { m, runner, procs } = manager()
+    m.allowInstall(ws) // a bare temp project lacks the preview packages
     m.templateWritten('s1', ws, 'src/pages/main/page.tsx')
     expect(m.status('s1')).toMatchObject({ workspace: ws, page: 'src/pages/main/page.tsx', openSeq: 1 })
     await vi.waitFor(() => expect(runner.calls).toHaveLength(1))
@@ -248,6 +249,7 @@ describe('preview manager', () => {
   it('packagesInstalled (shell install) restarts a running Vite and starts nothing when none runs', async () => {
     const ws = tempProject()
     const { m, runner, procs } = manager()
+    m.allowInstall(ws) // a bare temp project lacks the preview packages
     m.packagesInstalled(ws) // no preview yet: nothing starts
     await tick()
     expect(procs).toHaveLength(0)
@@ -304,6 +306,7 @@ describe('preview manager', () => {
   it('restarts a running Vite when a template write installed packages (Vite caches failed resolutions)', async () => {
     const ws = tempProject()
     const { m, runner, procs } = manager()
+    m.allowInstall(ws) // a bare temp project lacks the preview packages
     m.templateWritten('s1', ws, 'src/pages/main/page.tsx')
     await vi.waitFor(() => expect(runner.calls).toHaveLength(1))
     runner.calls[0]!.resolve(ok())
@@ -340,6 +343,7 @@ describe('preview manager', () => {
   it('after a restart, open() resolves an unknown session to its workspace and the default page', async () => {
     const ws = tempProject({ 'src/pages/main/page.tsx': 'export default () => null\n' })
     const { m, runner, procs } = manager()
+    m.allowInstall(ws) // a bare temp project lacks the preview packages
     m.setResolver(async (id) => (id === 's9' ? ws : undefined))
     const p = m.open('s9')
     await vi.waitFor(() => expect(runner.calls).toHaveLength(1))
@@ -436,6 +440,7 @@ describe('review fixes', () => {
   it('an install while Vite is still starting restarts it once it is up', async () => {
     const ws = tempProject()
     const { m, runner, procs } = manager()
+    m.allowInstall(ws) // a bare temp project lacks the preview packages
     m.templateWritten('s1', ws, 'src/pages/main/page.tsx')
     await vi.waitFor(() => expect(runner.calls).toHaveLength(1))
     runner.calls[0]!.resolve(ok())
@@ -455,6 +460,7 @@ describe('review fixes', () => {
   it('two installs while Vite starts cause one restart, not two', async () => {
     const ws = tempProject()
     const { m, runner, procs } = manager()
+    m.allowInstall(ws) // a bare temp project lacks the preview packages
     m.templateWritten('s1', ws, 'src/pages/main/page.tsx')
     await vi.waitFor(() => expect(runner.calls).toHaveLength(1))
     runner.calls[0]!.resolve(ok())
@@ -520,6 +526,7 @@ describe('security review fixes', () => {
     const runner = fakeRunner()
     const m = new PreviewManager({ run: runner.run, installTimeoutMs: 1000 })
     m.setSpawner(() => ({ onOutput: () => undefined, done: new Promise(() => undefined), terminate: () => undefined }))
+    m.allowInstall(ws)
     void m.ensure(ws)
     await vi.waitFor(() => expect(runner.calls).toHaveLength(1))
     expect(runner.calls[0]!.args.slice(0, 3)).toEqual(['add', '--ignore-scripts', '--ignore-pnpmfile'])
@@ -529,5 +536,43 @@ describe('security review fixes', () => {
     expect(runner.calls[1]!.args.slice(0, 2)).toEqual(['install', '--ignore-scripts'])
     runner.calls[1]!.resolve(ok())
     m.stopAll()
+  })
+})
+
+describe('install consent for projects the plugin did not create', () => {
+  it('waits in needs-install (nothing installed or written) until the user approves in the tab', async () => {
+    const ws = tempProject({ 'src/pages/main/page.tsx': 'export default () => null\n' })
+    const runner = fakeRunner()
+    const procs: string[][] = []
+    const m = new PreviewManager({ run: runner.run, installTimeoutMs: 1000 })
+    m.setSpawner((argv) => (procs.push([...argv]), { onOutput: () => undefined, done: new Promise(() => undefined), terminate: () => undefined }))
+    m.templateWritten('s1', ws, 'src/pages/main/page.tsx')
+    await vi.waitFor(() => expect(m.status('s1').preview.state).toBe('needs-install'))
+    const st = m.status('s1').preview
+    expect(st.missing).toContain('@astryxdesign/theme-gothic')
+    expect(st.missing).toContain('vite')
+    await tick()
+    expect(runner.calls).toHaveLength(0)
+    expect(procs).toHaveLength(0)
+    expect(existsSync(join(ws, PREVIEW_DIR))).toBe(false) // the project is untouched
+    expect(existsSync(join(ws, '.gitignore'))).toBe(false)
+
+    const approved = m.approveInstall('s1')
+    await vi.waitFor(() => expect(runner.calls).toHaveLength(1))
+    expect(runner.calls[0]!.args.slice(0, 3)).toEqual(['add', '--ignore-scripts', '--ignore-pnpmfile'])
+    expect(existsSync(join(ws, PREVIEW_DIR, 'main.tsx'))).toBe(true)
+    runner.calls[0]!.resolve(ok())
+    await vi.waitFor(() => expect(procs).toHaveLength(1))
+    void approved
+    m.stopAll()
+  })
+
+  it('the RPC endpoint installPreview approves for the calling session', async () => {
+    const calls: string[] = []
+    const fake = { approveInstall: async (id: string) => (calls.push(id), { preview: { state: 'starting', log: [] } }) } as unknown as PreviewManager
+    const h = createRpcHandler({ manager: fake, exportHtml: async () => '' })
+    const r = await h('installPreview', { sessionId: 's9' }, new AbortController().signal, {} as never)
+    expect(r).toMatchObject({ ok: true })
+    expect(calls).toEqual(['s9'])
   })
 })

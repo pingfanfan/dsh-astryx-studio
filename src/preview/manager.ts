@@ -55,6 +55,10 @@ export class PreviewManager {
   private readonly sessions = new Map<string, SessionState>()
   private readonly servers = new Map<string, PreviewServer>()
   private readonly verify = new Map<string, VerifyStatus>()
+  /** Projects whose preview-package install the user approved in the tab (this Host run). */
+  private readonly installApproved = new Set<string>()
+  /** Projects waiting for that approval, with the packages they lack. */
+  private readonly installPending = new Map<string, string[]>()
   /** Workspaces whose Vite restarts once its current start finishes (an install landed meanwhile). */
   private readonly restartPending = new Set<string>()
   private spawner: Spawner | undefined
@@ -165,8 +169,15 @@ export class PreviewManager {
       this.servers.set(workspace, server)
     }
     if (server.status().state === 'running') return server.status()
-    writePreviewHarness(workspace)
     const missing = missingPreviewPackages(workspace)
+    // Scaffolded projects ship every preview package. Anything missing means a project the
+    // plugin did not create: its package.json changes only after the user approves in the tab.
+    if (missing.length > 0 && !this.installApproved.has(workspace)) {
+      this.installPending.set(workspace, missing)
+      return { state: 'needs-install', missing, log: [] }
+    }
+    this.installPending.delete(workspace)
+    writePreviewHarness(workspace)
     if (missing.length > 0) {
       const r = await this.opts.run('pnpm', addArgs('pnpm', missing.map(installSpec)), { cwd: workspace, timeoutMs: this.opts.installTimeoutMs })
       if (r.code !== 0) {
@@ -178,6 +189,21 @@ export class PreviewManager {
   }
 
   /** The tab opened or asked for a status: start lazily for a known workspace. */
+  /** The user approved installing the preview packages into the session's project. */
+  async approveInstall(sessionId: string): Promise<SessionStatus> {
+    const s = this.session(sessionId)
+    if (s.workspace) {
+      this.allowInstall(s.workspace)
+      await this.ensure(s.workspace)
+    }
+    return this.status(sessionId)
+  }
+
+  /** Allow preview-package installs into `workspace` without asking (approval, or tests). */
+  allowInstall(workspace: string): void {
+    this.installApproved.add(workspace)
+  }
+
   async open(sessionId: string): Promise<SessionStatus> {
     const s = this.session(sessionId)
     if (!s.workspace && this.resolver) {
@@ -194,9 +220,12 @@ export class PreviewManager {
   status(sessionId: string): SessionStatus {
     const s = this.session(sessionId)
     const server = s.workspace ? this.servers.get(s.workspace) : undefined
+    const pending = s.workspace ? this.installPending.get(s.workspace) : undefined
     const preview: PreviewStatus = !this.spawner
       ? { state: 'unavailable', error: 'ctx.subprocess is not available in this profile', log: [] }
-      : (server?.status() ?? { state: 'idle', log: [] })
+      : pending && server?.status().state !== 'running'
+        ? { state: 'needs-install', missing: pending, log: [] }
+        : (server?.status() ?? { state: 'idle', log: [] })
     return {
       ...(s.workspace ? { workspace: s.workspace } : {}),
       ...(s.page ? { page: s.page } : {}),

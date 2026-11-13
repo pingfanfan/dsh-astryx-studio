@@ -30,6 +30,7 @@ Found by testing 0.1.0 end to end in DSH; details and before/after runs in [docs
 Found by an independent security review; none critical.
 
 - **The preview dev server is locked down.** CORS is off, so other localhost pages can no longer read the workspace sources. Only local pages may frame the preview (`frame-ancestors`). The preview posts its messages only to a local parent, never to `*`.
+- **Installs into other people's projects need approval.** In a project the plugin did not create, the preview no longer adds packages to its `package.json` on its own. The tab lists the missing packages, and installs them only when the user clicks the button. `astryx_screenshot` tells the model to ask the user. Scaffolded projects ship every preview package and never see the prompt.
 - **Installs run no project code.** Installs into a workspace run with `--ignore-scripts` (and `--ignore-pnpmfile` with pnpm), so a cloned project's lifecycle scripts or `.pnpmfile.cjs` do not run.
 - **Model-supplied paths are checked against real paths,** so a symlink in the workspace cannot redirect a write. Template and render targets must be `.tsx` under `src/`, and exports `.html`, never in `node_modules` or a dot-folder.
 - **Page output is marked as data.** Runtime errors and screenshot console errors reach the model fenced and labelled as page output, with control characters removed.

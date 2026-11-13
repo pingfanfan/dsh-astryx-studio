@@ -12,7 +12,7 @@
  */
 export const RPC_CHANNEL = '/api'
 export const RPC_PREFIX = 'astryx-studio'
-export const RPC_ENDPOINTS = ['status', 'openPreview', 'reportRuntimeError', 'exportHtml', 'gallery', 'startTemplate', 'getPrefs', 'setPrefs'] as const
+export const RPC_ENDPOINTS = ['status', 'openPreview', 'installPreview', 'reportRuntimeError', 'exportHtml', 'gallery', 'startTemplate', 'getPrefs', 'setPrefs'] as const
 
 export const THEMES = ['neutral', 'stone', 'matcha', 'y2k', 'gothic', 'chocolate', 'butter'] as const
 export type ThemeName = (typeof THEMES)[number]
@@ -31,7 +31,8 @@ export type PreviewMessage =
 export const PREVIEW_COMMAND_SOURCE = 'astryx-studio-tab'
 export type PreviewCommand = { source: typeof PREVIEW_COMMAND_SOURCE; type: 'set'; theme: ThemeName; dark: boolean }
 
-export type PreviewState = 'idle' | 'starting' | 'running' | 'error' | 'unavailable'
+/** `needs-install`: a project the plugin did not create lacks preview packages; the user approves the install in the tab. */
+export type PreviewState = 'idle' | 'starting' | 'running' | 'error' | 'unavailable' | 'needs-install'
 
 export interface PreviewStatus {
   readonly state: PreviewState
@@ -39,6 +40,8 @@ export interface PreviewStatus {
   readonly url?: string
   readonly error?: string
   readonly log: readonly string[]
+  /** With `needs-install`: the packages the preview would add to the project's package.json. */
+  readonly missing?: readonly string[]
 }
 
 export type VerifyState = 'none' | 'running' | 'pass' | 'fail' | 'unverified'

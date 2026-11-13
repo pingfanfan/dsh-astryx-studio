@@ -199,6 +199,12 @@ export function apply(ctx: Context, config: Partial<Config> = {}, overrides: Ove
       )
     }
     const preview = await manager.ensure(workspace)
+    if (preview.state === 'needs-install') {
+      throw new Error(
+        `this project was not created by the plugin and lacks preview packages (${(preview.missing ?? []).join(', ')}). ` +
+          'Ask the user to click the install button in the Astryx preview tab; do not install them yourself.',
+      )
+    }
     if (preview.state !== 'running' || !preview.url) throw new Error(`the preview Vite is not running (${preview.state}): ${preview.error ?? ''}`)
     const prefs = readPrefs(prefsFile)
     const theme = (a.theme ?? prefs?.theme ?? 'neutral') as ThemeName

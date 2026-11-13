@@ -85,7 +85,7 @@ describe('rpc registration', () => {
     boot(undefined)
     expect(paths).toEqual([])
     boot(tempProject(), { connection })
-    expect(paths).toEqual(['status', 'openPreview', 'reportRuntimeError', 'exportHtml', 'gallery', 'startTemplate', 'getPrefs', 'setPrefs', 'thumb'].map((e) => `/api/astryx-studio/${e}`))
+    expect(paths).toEqual(['status', 'openPreview', 'installPreview', 'reportRuntimeError', 'exportHtml', 'gallery', 'startTemplate', 'getPrefs', 'setPrefs', 'thumb'].map((e) => `/api/astryx-studio/${e}`))
   })
 })
 

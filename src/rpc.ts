@@ -1,6 +1,6 @@
 /**
  * `/astryx-studio` RPC channel: the client tab's only way to reach the Host.
- * Endpoints: status, openPreview, reportRuntimeError, exportHtml.
+ * Endpoints: status, openPreview, installPreview, reportRuntimeError, exportHtml, gallery, startTemplate, getPrefs, setPrefs.
  */
 import type { ConnectionFetchRoute, ConnectionRpcHandler, ConnectionRpcHandlerResult } from '@deepseek-ai/dsh-client-connection'
 import { galleryItems, isTemplateId, readPrefs, sanitizePrefs, startTemplateText, writePrefs } from './gallery.js'
@@ -36,6 +36,10 @@ export function createRpcHandler(deps: RpcDeps): ConnectionRpcHandler {
         return ok(deps.manager.status(sessionId))
       case 'openPreview':
         return ok(await deps.manager.open(sessionId))
+      case 'installPreview':
+        // Only from the tab's button: the user approves adding the preview packages to a project
+        // the plugin did not create.
+        return ok(await deps.manager.approveInstall(sessionId))
       case 'reportRuntimeError': {
         const p = payload as { kind?: unknown; message?: unknown; stack?: unknown }
         if (typeof p.message !== 'string' || !p.message) return fail('BAD_REQUEST', 'payload.message is required')
