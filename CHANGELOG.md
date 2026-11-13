@@ -43,6 +43,8 @@ Found by testing 0.1.0 end to end in DSH; details and before/after runs in [docs
 
 Found by an independent security review; none critical.
 
+- **Dependency audit is clean.** The repo's lockfile overrides `zod` (to ≥4.6.6) and `undici` (to ≥8.12.2), which `pnpm audit` flagged. Installs of the plugin were not affected: `zod` reaches users only through `@astryxdesign/cli`'s `^4.4.3`, which already resolves to a fixed version, and `undici` comes only from DSH's own packages, which DSH supplies at runtime.
+
 - **The preview dev server is locked down.** CORS is off, so other localhost pages can no longer read the workspace sources. Only local pages and the DSH desktop app (`dsh-app://app`) may frame the preview (`frame-ancestors`), so its messages can only reach DSH.
 - **Installs into other people's projects need approval.** In a project the plugin did not create, the preview no longer adds packages to its `package.json` on its own. The tab lists the missing packages, and installs them only when the user clicks the button. `astryx_screenshot` tells the model to ask the user. In such a project, `astryx_template` also asks through DSH's approval card, because writing a template may add its packages. Scaffolded projects ship every preview package and never see the prompt.
 - **Installs run no project code.** Installs into a workspace run with `--ignore-scripts` (and `--ignore-pnpmfile` with pnpm), so a cloned project's lifecycle scripts or `.pnpmfile.cjs` do not run.
