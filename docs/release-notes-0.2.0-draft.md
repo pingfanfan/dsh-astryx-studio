@@ -28,6 +28,7 @@
 
 - Windows 未测试：插件不经 shell 启动 `pnpm` 和 `.bin/vite`，Windows 的 `.cmd` 启动脚本不允许这样调用。
 - 「在 web-review 打开」按钮还没在装了 web-review 的环境里测过。
+- 所有实测都在 DSH 网页版（`dev` profile）里做的。DSH 桌面 app 的界面运行在 `dsh-app://app`，预览的安全策略已经放行它，但没有在桌面 app 里实测。
 
 完整改动见 [CHANGELOG.md](../CHANGELOG.md)。
 
@@ -63,5 +64,6 @@ This release comes from an end-to-end test of 0.1.0: building pages in DeepSeek 
 
 - Windows is untested: the plugin starts `pnpm` and `.bin/vite` without a shell, which Windows `.cmd` shims do not allow.
 - The "在 web-review 打开" button is untested with web-review installed.
+- All testing was in the DSH web UI (`dev` profile). The DSH desktop app's UI runs on `dsh-app://app`; the preview's CSP allows it, but it is untested in the desktop app.
 
 Full list: [CHANGELOG.md](../CHANGELOG.md).
