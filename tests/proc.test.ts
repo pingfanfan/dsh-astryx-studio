@@ -29,6 +29,17 @@ describe('runProcess (real child processes)', () => {
     expect((await runProcess(node, ['-e', 'setTimeout(() => {}, 60000)'], { cwd, signal: pre.signal })).aborted).toBe(true)
   })
 
+  it('escalates to SIGKILL when the child ignores SIGTERM', async () => {
+    if (process.platform === 'win32') return
+    const script = 'process.on("SIGTERM", () => {}); process.stdout.write("up"); setInterval(() => {}, 1000)'
+    const ac = new AbortController()
+    const p = runProcess(node, ['-e', script], { cwd, signal: ac.signal })
+    setTimeout(() => ac.abort(), 200)
+    const r = await p
+    expect(r.aborted).toBe(true)
+    expect(r.ms).toBeLessThan(8000)
+  }, 10_000)
+
   it('rejects when the command cannot be spawned', async () => {
     await expect(runProcess('astryx-no-such-command-xyz', [], { cwd })).rejects.toThrow(/ENOENT/)
   })

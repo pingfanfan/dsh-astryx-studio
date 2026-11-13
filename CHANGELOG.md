@@ -30,6 +30,8 @@ Found by testing 0.1.0 end to end in DSH; details and before/after runs in [docs
   - When the parent agent and a subagent both write in a workspace, each one sees the next tsc result, instead of whoever asked first taking it.
   - A tsc run that cannot start (for example, in a read-only workspace) shows as "unverified" instead of an unhandled error. Windows tsc paths are shown relative to the workspace.
 
+- An install or tsc run that times out or is cancelled is killed with SIGKILL if it ignores SIGTERM for 3 s, so it can no longer hold the tool call forever.
+
 - Windows: `pnpm`/`npm` run through `cmd.exe` with quoted arguments, and Vite and tsc run from their JavaScript entries with `node`, because Node cannot spawn `.cmd` shims directly. Unit-tested only; not yet run on Windows.
 
 ### Performance

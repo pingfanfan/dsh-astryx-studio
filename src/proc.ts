@@ -20,6 +20,9 @@ export interface RunOptions {
 
 export type Runner = (command: string, args: readonly string[], options: RunOptions) => Promise<RunResult>
 
+/** How long a killed child gets to exit on SIGTERM before SIGKILL. */
+export const KILL_GRACE_MS = 3000
+
 /** Spawn a process, collect output, honour abort and timeout. Never rejects on a non-zero exit. */
 export const runProcess: Runner = (command, args, options) =>
   new Promise((resolvePromise, reject) => {
@@ -39,8 +42,15 @@ export const runProcess: Runner = (command, args, options) =>
     let aborted = false
     child.stdout.on('data', (d: Buffer) => (stdout += d.toString()))
     child.stderr.on('data', (d: Buffer) => (stderr += d.toString()))
+    let force: ReturnType<typeof setTimeout> | undefined
     const kill = () => {
-      if (child.exitCode === null) child.kill('SIGTERM')
+      if (child.exitCode !== null || child.signalCode !== null) return
+      child.kill('SIGTERM')
+      // A child that ignores SIGTERM must not hold the caller forever.
+      force ??= setTimeout(() => {
+        if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL')
+      }, KILL_GRACE_MS)
+      force.unref?.()
     }
     const onAbort = () => {
       aborted = true
@@ -57,11 +67,13 @@ export const runProcess: Runner = (command, args, options) =>
         : undefined
     child.on('error', (error) => {
       if (timer) clearTimeout(timer)
+      if (force) clearTimeout(force)
       options.signal?.removeEventListener('abort', onAbort)
       reject(error)
     })
     child.on('close', (code) => {
       if (timer) clearTimeout(timer)
+      if (force) clearTimeout(force)
       options.signal?.removeEventListener('abort', onAbort)
       resolvePromise({ code, stdout, stderr, timedOut, aborted, ms: Date.now() - started })
     })
