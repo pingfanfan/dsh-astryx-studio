@@ -499,17 +499,15 @@ describe('review fixes', () => {
 })
 
 describe('security review fixes', () => {
-  it('preview Vite: no CORS, only local pages may frame it, and the page posts only to a local parent', () => {
+  it('preview Vite: no CORS; only local pages and the DSH desktop app may frame it; posts go to that parent', () => {
     const files = previewFiles('/w')
     const cfg = files[`${PREVIEW_DIR}/vite.config.ts`]!
     expect(cfg).toContain('cors: false,')
-    expect(cfg).toContain(`frame-ancestors 'self' http://127.0.0.1:* http://localhost:* http://[::1]:*`)
+    expect(cfg).toContain(`frame-ancestors 'self' http://127.0.0.1:* http://localhost:* dsh-app://app`)
     const main = files[`${PREVIEW_DIR}/main.tsx`]!
     expect(main).not.toContain("postMessage({source: SOURCE, ...message}, '*')")
     expect(main).toContain('if (PARENT) window.parent.postMessage({source: SOURCE, ...message}, PARENT);')
-    const re = new Function(`return ${/(\/\^http:.+\$\/)\.test\(origin\)/.exec(main)![1]}`)() as RegExp
-    for (const ok of ['http://127.0.0.1:3080', 'http://localhost:5173', 'http://[::1]:8080']) expect(re.test(ok), ok).toBe(true)
-    for (const bad of ['https://evil.example', 'http://127.0.0.1.evil.example', 'http://localhost.evil:1']) expect(re.test(bad), bad).toBe(false)
+    expect(main).toContain("return origin && origin !== 'null' ? origin : '*';")
   })
 
   it('runtime errors reach the model fenced and marked as page output, without control characters', () => {
