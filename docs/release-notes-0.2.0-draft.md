@@ -13,12 +13,16 @@
   - `astryx_build` 和 `astryx_search` 会把中文关键词转成英文：以前中文需求全部落到同一个不相干的模板，中文搜索结果都是 0 条。
   - 新建项目默认显示中文组件文案（必填/可选、日期）。
 - **写入检查更准。** `astryx verify` 只数代码（注释里的 `<div>` 不算），用 `apply_patch` 改名的文件和改名前的内容比较，主 agent 和子 agent 都能收到各自的 tsc 结论，新的写入之后不会再拿到过时的结论。
+- **预览更稳。** 安装失败后在终端装好依赖，预览会自己恢复；标签页隐藏时停止轮询；长时间运行后崩溃的 Vite 会再自动重启一次；整页截图不再截断带 `100vh` 区块的页面，页面卡死时截图也不会一直挂着。
+- **在子文件夹里打开会话也能找到项目。** 从 `myapp/src` 打开会话时使用外层的 Astryx 项目，不会再在里面嵌套新建一个。
 - **更快、更小。** 冷启动后的首次预览从约 12 秒降到约 6 秒，安装包从 1.1 MB 降到约 0.5 MB。
 - **更安全。** 一次独立安全审查发现的问题已全部修复：
   - 预览服务器关闭跨域访问，只允许本机页面嵌入；
   - 往别人的项目里装依赖前会先询问，安装时不运行项目自带的脚本；
   - 路径按真实路径检查；
   - 页面报错以「数据」而不是「指令」的形式交给模型。
+- **新建项目不碰别人的东西。** 在上层 pnpm workspace 里新建 `./astryx-app` 时，安装不再运行上层项目的 `.pnpmfile.cjs` 和 `postinstall`、不再改上层的 lockfile；脚手架也不会覆盖文件夹里已有的文件。
+- **预览标签页只信任预览服务器。** 生成的页面里的链接把预览带到别的网站后，那个网站发来的消息不会再被当成「运行时错误」交给模型。
 - **依赖审计无已知漏洞。** `pnpm audit` 报出的 `zod`、`undici` 漏洞都已处理；插件用户本来就不受影响。
 
 ## 新选项
@@ -51,12 +55,16 @@ This release comes from an end-to-end test of 0.1.0: building pages in DeepSeek 
   - `astryx_build` and `astryx_search` map Chinese keywords to English. Before, every Chinese request landed on the same unrelated template, and every Chinese search returned nothing.
   - New projects show Chinese built-in component text (必填/可选, dates).
 - **A more accurate write check.** `astryx verify` counts code only (a `<div>` in a comment does not count), compares a file renamed with `apply_patch` with its old contents, gives the parent agent and each subagent their own tsc verdict, and never hands out a verdict older than the latest write.
+- **A sturdier preview.** After a failed install, installing from the terminal brings the preview back; the tab stops polling while hidden; a Vite that crashes after a long healthy run is restarted again; full-page screenshots no longer cut off pages with `100vh` sections, and a stuck page can no longer hang a screenshot.
+- **Sessions in a subfolder find their project.** A session opened in `myapp/src` uses the enclosing Astryx project instead of scaffolding a second one inside it.
 - **Faster and smaller.** The first preview after a cold start is ready in about 6 s instead of about 12 s. The package is about 0.5 MB instead of 1.1 MB.
 - **Safer.** Everything an independent security review found is fixed:
   - the preview server has CORS off and allows only local framing;
   - installs into other people's projects need approval and never run the project's scripts;
   - paths are checked against real paths;
   - page errors reach the model as data, not instructions.
+- **Creating a project leaves other projects alone.** Inside a parent pnpm workspace, creating `./astryx-app` no longer runs the parent's `.pnpmfile.cjs` or `postinstall` or rewrites its lockfile, and the scaffold never overwrites files already in the folder.
+- **The preview tab trusts only the preview server.** If a link in a generated page takes the preview to another site, that site's messages are no longer passed to the model as "runtime errors".
 - **A clean dependency audit.** The `zod` and `undici` advisories `pnpm audit` reported are handled; plugin users were not affected.
 
 ## New options
