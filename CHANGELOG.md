@@ -22,6 +22,13 @@ Found by testing 0.1.0 end to end in DSH; details and before/after runs in [docs
 - The gallery's "no matching templates" message sat at the bottom of an empty grid. It now sits under the toolbar, with a clear-search button.
 - A page that does not compile now shows its error in the preview, instead of "No page at …". Page paths may contain Chinese or spaces, and Windows paths work.
 - `astryx_screenshot` no longer leaks Chrome when it fails to start, and cleaning up its profile can no longer crash the Host.
+- The write check (`astryx verify`) is more accurate:
+  - A file renamed with `apply_patch` is compared with its old contents, not treated as new. Patch operations that did not complete are skipped.
+  - Each tool execution keeps its own "before" snapshot, even when two calls share an id, and stale snapshots expire after 10 minutes.
+  - A `<div>` in a comment and spacing like `style = {{` no longer change the counts.
+  - A write that fixes a syntax error is not blamed for imports the file already had.
+  - When the parent agent and a subagent both write in a workspace, each one sees the next tsc result, instead of whoever asked first taking it.
+  - A tsc run that cannot start (for example, in a read-only workspace) shows as "unverified" instead of an unhandled error. Windows tsc paths are shown relative to the workspace.
 
 - Windows: `pnpm`/`npm` run through `cmd.exe` with quoted arguments, and Vite and tsc run from their JavaScript entries with `node`, because Node cannot spawn `.cmd` shims directly. Unit-tested only; not yet run on Windows.
 

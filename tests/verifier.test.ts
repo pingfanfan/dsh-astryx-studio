@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { createTscScheduler, parseTscOutput } from '../src/verify/tsc.js'
-import { pathsFromArgs, pathsFromValue, Verifier } from '../src/verify/verifier.js'
+import { pathsFromArgs, pathsFromValue, Verifier, writesFromValue } from '../src/verify/verifier.js'
 import { fakeRunner, ok, tempProject, tick } from './helpers.js'
 
 const PAGE = `import {VStack} from '@astryxdesign/core/Layout';\nexport default function Page() { return <VStack gap={2}>hi</VStack> }\n`
@@ -146,5 +146,53 @@ describe('tsc scheduler', () => {
     expect(calls[0]!.args.join(' ')).toContain('--incremental --tsBuildInfoFile .astryx-studio/tsbuildinfo')
     expect(readFileSync(join(ws, 'package.json'), 'utf8')).toContain('@astryxdesign/core')
     tsc.dispose()
+  })
+})
+
+describe('review fixes', () => {
+  it('an apply_patch move is judged against the source file, so a rename is not a new file', async () => {
+    const before = PAGE.replace('hi', '<div>hi</div>')
+    const { ws, verifier } = setup({ 'src/old.tsx': before })
+    const patch = '*** Begin Patch\n*** Update File: src/old.tsx\n*** Move to: src/new.tsx\n@@\n-x\n+y\n*** End Patch'
+    verifier.snapshot('m1', 'apply_patch', { input: patch }, ws)
+    writeFileSync(join(ws, 'src/new.tsx'), before)
+    const value = { operations: [{ kind: 'update', path: 'src/old.tsx', destination: 'src/new.tsx', status: 'completed' }] }
+    expect(await verifier.afterWrite({ callId: 'm1', name: 'apply_patch', value, cwd: ws, workspace: ws, agentId: 'a1' })).toEqual([])
+  })
+
+  it('skips apply_patch operations that did not complete', () => {
+    expect(writesFromValue('apply_patch', { operations: [{ kind: 'update', path: 'a.tsx', status: 'failed' }, { kind: 'add', path: 'b.tsx', status: 'completed' }] }, '/w')).toEqual([
+      { file: '/w/b.tsx', from: '/w/b.tsx' },
+    ])
+  })
+
+  it('snapshots are keyed by any property key (DSH execution tokens are symbols)', async () => {
+    const { ws, verifier } = setup()
+    const file = join(ws, 'src/page.tsx')
+    const a = Symbol('a')
+    const b = Symbol('b') // same model call id in practice; distinct executions
+    verifier.snapshot(a, 'edit', { file_path: file }, ws)
+    writeFileSync(file, PAGE.replace('hi', '<div>hi</div>'))
+    verifier.snapshot(b, 'edit', { file_path: file }, ws)
+    expect((await verifier.afterWrite({ callId: a, name: 'edit', value: { path: file }, cwd: ws, workspace: ws, agentId: 'a1' }))[0]!.lint.map((l) => l.rule)).toEqual(['div'])
+    expect(await verifier.afterWrite({ callId: b, name: 'edit', value: { path: file }, cwd: ws, workspace: ws, agentId: 'a1' })).toEqual([])
+  })
+
+  it('each agent that wrote in the workspace sees the tsc result once', async () => {
+    const { ws, calls, verifier } = setup()
+    const file = join(ws, 'src/page.tsx')
+    await verifier.afterWrite({ callId: 'p', name: 'write', value: { path: file }, cwd: ws, workspace: ws, agentId: 'parent' })
+    await verifier.afterWrite({ callId: 's', name: 'write', value: { path: file }, cwd: ws, workspace: ws, agentId: 'sub' })
+    calls[1]!.resolve(ok({ code: 2, stdout: `src/page.tsx(2,40): error TS2322: bad.` }))
+    await tick()
+    expect((await verifier.collect('sub'))?.outcome.kind).toBe('fail')
+    expect((await verifier.collect('parent'))?.outcome.kind).toBe('fail')
+    expect(await verifier.collect('sub')).toBeUndefined()
+    expect(await verifier.collect('parent')).toBeUndefined()
+  })
+
+  it('a tsc that cannot even be set up is "unverified", not an unhandled rejection', async () => {
+    const tsc = createTscScheduler({ run: async () => { throw new Error('spawn ENOENT') }, timeoutMs: 1000 })
+    expect((await tsc.schedule('/nonexistent/readonly/ws'))?.kind).toBe('unverified')
   })
 })

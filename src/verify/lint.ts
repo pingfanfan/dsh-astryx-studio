@@ -1,4 +1,4 @@
-import { build, type Plugin } from 'esbuild'
+import { build, transform, type Plugin } from 'esbuild'
 
 /**
  * Count-diff lint. Templates already contain `<div>` (ide), many `style={}`
@@ -46,6 +46,38 @@ const HINT: Record<keyof LintCounts, string> = {
 export function countLint(source: string): LintCounts {
   const n = (re: RegExp) => source.match(re)?.length ?? 0
   return { div: n(COUNTERS.div), inlineStyle: n(COUNTERS.inlineStyle), stylexCreate: n(COUNTERS.stylexCreate) }
+}
+
+/**
+ * The source as esbuild prints it back with JSX preserved: comments gone and spacing
+ * normalized (`style = {{` becomes `style={{`), so counts reflect code, not prose about it.
+ * Undefined when it does not parse (the raw text is counted then).
+ */
+export async function normalizeForCount(source: string, file = 'page.tsx'): Promise<string | undefined> {
+  if (!source) return ''
+  try {
+    const r = await transform(source, { loader: file.endsWith('.tsx') ? 'tsx' : 'ts', jsx: 'preserve', legalComments: 'none', logLevel: 'silent', tsconfigRaw: { compilerOptions: { verbatimModuleSyntax: true } } })
+    return r.code
+  } catch {
+    return undefined
+  }
+}
+
+/** Code-level counts: on esbuild's printout when the source parses, else on the raw text. */
+export async function countLintCode(source: string, file = 'page.tsx'): Promise<LintCounts> {
+  return countLint((await normalizeForCount(source, file)) ?? source)
+}
+
+const IMPORT_RE = /\bimport\s+(?!type\b)[^'"`;]*?from\s*['"]([^'"]+)['"]|\bimport\s*['"]([^'"]+)['"]|\bimport\s*\(\s*['"`]([^'"`]+)['"`]\s*\)|\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)|\bexport\s+(?!type\b)[^'"`;]*?from\s*['"]([^'"]+)['"]/g
+
+/** Bare specifiers by text, for a `before` that does not parse (never empty the baseline). */
+export function importSpecifiersByText(source: string): string[] {
+  const out: string[] = []
+  for (const m of source.matchAll(IMPORT_RE)) {
+    const spec = m[1] ?? m[2] ?? m[3] ?? m[4] ?? m[5]
+    if (spec && !spec.startsWith('.') && !spec.startsWith('/')) out.push(spec)
+  }
+  return out
 }
 
 /**
@@ -109,14 +141,17 @@ export async function lintDiff(
   file = 'page.tsx',
 ): Promise<LintFinding[]> {
   const findings: LintFinding[] = []
-  const a = countLint(before)
-  const b = countLint(after)
+  const a = await countLintCode(before, file)
+  const b = await countLintCode(after, file)
   for (const key of Object.keys(COUNTERS) as (keyof LintCounts)[]) {
     if (b[key] > a[key]) {
       findings.push({ rule: key, message: `${LABEL[key]} count ${a[key]} → ${b[key]}: ${HINT[key]}` })
     }
   }
-  const had = new Set((await importSpecifiers(before, file)).map(packageRoot))
+  // A broken `before` (the write fixes a syntax error) keeps its imports by a text scan, so the
+  // fix is not blamed for imports that were already there.
+  const beforeParses = before === '' || (await normalizeForCount(before, file)) !== undefined
+  const had = new Set((beforeParses ? await importSpecifiers(before, file) : importSpecifiersByText(before)).map(packageRoot))
   const added = new Set<string>()
   for (const spec of await importSpecifiers(after, file)) {
     const root = packageRoot(spec)

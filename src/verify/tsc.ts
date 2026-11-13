@@ -5,7 +5,7 @@
  */
 import { existsSync, mkdirSync } from 'node:fs'
 import { packageBin } from '../platform.js'
-import { join, relative } from 'node:path'
+import { isAbsolute, join, relative } from 'node:path'
 import type { Runner } from '../proc.js'
 
 export interface TscDiagnostic {
@@ -27,10 +27,15 @@ export function parseTscOutput(output: string, workspace: string): TscDiagnostic
   const out: TscDiagnostic[] = []
   for (const raw of output.split(/\r?\n/)) {
     const m = DIAG_RE.exec(raw.trim())
-    if (!m) continue
+    if (!m) {
+      // tsc indents the continuation lines of a long message (e.g. "Type 'X' is not assignable…").
+      const last = out[out.length - 1]
+      if (last && /^\s+\S/.test(raw)) out[out.length - 1] = { ...last, message: `${last.message} ${raw.trim()}` }
+      continue
+    }
     const file = m[1]!
     out.push({
-      file: file.startsWith('/') ? relative(workspace, file) : file,
+      file: isAbsolute(file) || /^[A-Za-z]:[\\/]/.test(file) ? relative(workspace, file) : file,
       line: Number(m[2]),
       column: Number(m[3]),
       code: m[4]!,
@@ -110,10 +115,12 @@ export function createTscScheduler(options: { run: Runner; timeoutMs: number }):
       const controller = new AbortController()
       inflight.set(workspace, controller)
       results.delete(workspace)
-      mkdirSync(join(workspace, '.astryx-studio'), { recursive: true })
-      const { command, args } = tscArgs(workspace)
       let outcome: TscOutcome
       try {
+        // Inside the try: a read-only or deleted workspace must end as "unverified", never as a
+        // rejection escaping the `void schedule()` callers (an unhandled rejection kills the host).
+        mkdirSync(join(workspace, '.astryx-studio'), { recursive: true })
+        const { command, args } = tscArgs(workspace)
         const r = await options.run(command, args, {
           cwd: workspace,
           signal: controller.signal,

@@ -267,7 +267,7 @@ export function apply(ctx: Context, config: Partial<Config> = {}, overrides: Ove
       }
       return next()
     }
-    if (isFileTool(exec.name)) verifier.snapshot(exec.callId, exec.name, exec.arguments, await cwdOf(exec))
+    if (isFileTool(exec.name)) verifier.snapshot(exec.token ?? exec.callId, exec.name, exec.arguments, await cwdOf(exec))
     return next()
   })
 
@@ -285,13 +285,13 @@ export function apply(ctx: Context, config: Partial<Config> = {}, overrides: Ove
     }
     if (!isFileTool(exec.name)) return next()
     if (result.isError) {
-      verifier.forget(exec.callId)
+      verifier.forget(exec.token ?? exec.callId)
       return next()
     }
     const cwd = await cwdOf(exec)
     const workspace = cwd ? detectWorkspace(cwd, cfg.appDir) : undefined
     const reports = await verifier.afterWrite({
-      callId: exec.callId,
+      callId: exec.token ?? exec.callId,
       name: exec.name,
       value: result.value,
       cwd,
