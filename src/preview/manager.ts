@@ -51,6 +51,10 @@ export interface PreviewManagerOptions {
   readonly now?: () => number
 }
 
+/** Runtime errors queued for one agent step, and distinct errors remembered between writes. */
+const MAX_PENDING_ERRORS = 20
+const MAX_SEEN_ERRORS = 200
+
 export class PreviewManager {
   private readonly sessions = new Map<string, SessionState>()
   private readonly servers = new Map<string, PreviewServer>()
@@ -294,7 +298,8 @@ export class PreviewManager {
   }
 
   status(sessionId: string): SessionStatus {
-    const s = this.session(sessionId)
+    // Read-only: a status poll for an unknown id must not create a session entry.
+    const s = this.sessions.get(sessionId) ?? { openSeq: 0, seen: new Set<string>(), pending: [] }
     const server = s.workspace ? this.servers.get(s.workspace) : undefined
     let pending = s.workspace ? this.installPending.get(s.workspace) : undefined
     if (pending && s.workspace && missingPreviewPackages(s.workspace).length === 0) {
@@ -328,10 +333,12 @@ export class PreviewManager {
    * and the same error has not been queued since. Returns whether it was queued.
    */
   reportRuntimeError(sessionId: string, report: RuntimeErrorReport, at = this.now()): boolean {
-    const s = this.session(sessionId)
-    if (s.lastWriteAt === undefined || at < s.lastWriteAt) return false
+    const s = this.sessions.get(sessionId)
+    if (!s || s.lastWriteAt === undefined || at < s.lastWriteAt) return false
     const key = `${report.kind}:${report.message}`
     if (s.seen.has(key)) return false
+    // A page throwing a new message in a loop must not flood the model's next step.
+    if (s.pending.length >= MAX_PENDING_ERRORS || s.seen.size >= MAX_SEEN_ERRORS) return false
     s.seen.add(key)
     s.pending.push(report)
     return true

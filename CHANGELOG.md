@@ -21,6 +21,11 @@ Found by testing 0.1.0 end to end in DSH; details and before/after runs in [docs
 - The tab reloads the iframe if a model write gets no HMR update within 4 s.
 - The gallery's "no matching templates" message sat at the bottom of an empty grid. It now sits under the toolbar, with a clear-search button.
 - A page that does not compile now shows its error in the preview, instead of "No page at …". Page paths may contain Chinese or spaces, and Windows paths work.
+- `astryx_screenshot` fixes from a review:
+  - Full-page shots of pages with `height: 100vh` sections are complete. The viewport no longer grows to the page height (which stretched those sections and cut off the rest); the page is captured beyond the viewport instead.
+  - A page stuck in an endless loop, or a preview that never answers, can no longer hang the tool: every DevTools call is bounded by the timeout and by cancel. A preview that refuses the connection fails at once instead of after 75 s.
+  - Only the first 5 console errors are kept while the page loads. If Chrome fails to start, its temporary profile is removed only after it has exited.
+- RPC and runtime-error fixes: status polls and error reports for unknown sessions no longer create session entries, at most 20 runtime errors reach the model per step, and a stored width such as `constructor` is rejected (`Object.hasOwn` instead of `in`).
 - Preview and gallery tab fixes from a review of the client:
   - The tab polls the Host only while it is visible, one call at a time; so does the watcher that opens the tab.
   - A status poll that was already under way can no longer undo a finished install and bring the install button back.

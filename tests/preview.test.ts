@@ -762,3 +762,20 @@ describe('preview review fixes', () => {
     m.stopAll()
   })
 })
+
+describe('rpc review fixes', () => {
+  it('status for an unknown session creates no entry; runtime errors for it are not queued', () => {
+    const m = new PreviewManager({ run: fakeRunner().run, installTimeoutMs: 1 })
+    m.status('nobody')
+    expect(m.reportRuntimeError('nobody', { kind: 'window', message: 'x' })).toBe(false)
+    expect((m as unknown as { sessions: Map<string, unknown> }).sessions.size).toBe(0)
+  })
+
+  it('caps the runtime errors queued for one step', () => {
+    const ws = tempProject()
+    const m = new PreviewManager({ run: fakeRunner().run, installTimeoutMs: 1, now: () => 1000 })
+    m.modelWrote('s', ws)
+    for (let i = 0; i < 100; i++) m.reportRuntimeError('s', { kind: 'window', message: `boom ${i}` }, 2000)
+    expect(m.takeRuntimeErrors('s')).toHaveLength(20)
+  })
+})

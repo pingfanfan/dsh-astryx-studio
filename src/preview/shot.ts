@@ -112,6 +112,24 @@ class Cdp {
   }
 }
 
+const MAX_CONSOLE_ERRORS = 5
+
+/** `p`, or a rejection once `deadline` passes or `signal` aborts. */
+function bounded<T>(p: Promise<T>, deadline: number, signal?: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    if (signal?.aborted) return reject(new Error('aborted'))
+    const onAbort = () => finish(() => reject(new Error('aborted')))
+    const timer = setTimeout(() => finish(() => reject(new Error('screenshot timed out'))), Math.max(0, deadline - Date.now()))
+    const finish = (f: () => void) => {
+      clearTimeout(timer)
+      signal?.removeEventListener('abort', onAbort)
+      f()
+    }
+    signal?.addEventListener('abort', onAbort, { once: true })
+    p.then((v) => finish(() => resolve(v)), (e: unknown) => finish(() => reject(e instanceof Error ? e : new Error(String(e)))))
+  })
+}
+
 const sleep = (ms: number, signal?: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
     if (signal?.aborted) return reject(new Error('aborted'))
@@ -147,8 +165,12 @@ function launch(chrome: string, profile: string, timeoutMs: number): Promise<{ p
       settled = true
       clearTimeout(timer)
       proc.stderr!.off('data', onData)
-      if (proc.exitCode === null) proc.kill('SIGKILL')
-      reject(e)
+      if (proc.exitCode !== null || proc.signalCode !== null) return reject(e)
+      // Let Chrome finish dying before the caller deletes its profile folder (it could recreate it).
+      const done = () => (clearTimeout(cap), reject(e))
+      const cap = setTimeout(done, 2000)
+      proc.once('exit', done)
+      proc.kill('SIGKILL')
     }
     const onData = (d: Buffer) => {
       err = (err + d.toString()).slice(-4000)
@@ -201,18 +223,23 @@ export async function captureScreenshot(o: ShotOptions): Promise<ShotResult> {
   try {
     const launched = await launch(o.chrome, profile, Math.min(20_000, timeoutMs))
     proc = launched.proc
-    cdp = await Cdp.open(launched.ws)
-    const { targetId } = (await cdp.send('Target.createTarget', { url: 'about:blank' })) as { targetId: string }
-    const { sessionId } = (await cdp.send('Target.attachToTarget', { targetId, flatten: true })) as { sessionId: string }
-    const send = (m: string, p?: Record<string, unknown>) => cdp!.send(m, p, sessionId)
+    // Every DevTools call is bounded by the deadline and the abort signal: a page stuck in
+    // `while (true) {}` never answers Runtime.evaluate, and a Vite that accepts but never responds
+    // stalls Page.navigate. The finally below then still kills Chrome and removes its profile.
+    cdp = await bounded(Cdp.open(launched.ws), deadline, o.signal)
+    const browser = cdp
+    const { targetId } = (await bounded(browser.send('Target.createTarget', { url: 'about:blank' }), deadline, o.signal)) as { targetId: string }
+    const { sessionId } = (await bounded(browser.send('Target.attachToTarget', { targetId, flatten: true }), deadline, o.signal)) as { sessionId: string }
+    const send = (m: string, p?: Record<string, unknown>) => bounded(browser.send(m, p, sessionId), deadline, o.signal)
 
     const consoleErrors: string[] = []
     cdp.on('Runtime.exceptionThrown', (p) => {
+      if (consoleErrors.length >= MAX_CONSOLE_ERRORS) return
       const d = p['exceptionDetails'] as { text?: string; exception?: unknown } | undefined
       consoleErrors.push(d?.exception ? describe(d.exception) : (d?.text ?? 'exception'))
     })
     cdp.on('Runtime.consoleAPICalled', (p) => {
-      if (p['type'] !== 'error') return
+      if (p['type'] !== 'error' || consoleErrors.length >= MAX_CONSOLE_ERRORS) return
       consoleErrors.push(((p['args'] as unknown[]) ?? []).map(describe).join(' '))
     })
 
@@ -222,7 +249,9 @@ export async function captureScreenshot(o: ShotOptions): Promise<ShotResult> {
     await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
     await send('Runtime.enable')
     await send('Page.enable')
-    await send('Page.navigate', { url: o.url })
+    const nav = (await send('Page.navigate', { url: o.url })) as { errorText?: string }
+    // A refused connection (preview not running) fails now, not after the whole wait.
+    if (nav.errorText) throw new Error(`cannot load ${o.url}: ${nav.errorText}`)
 
     // Wait for the harness to report ready / error (it may be retrying a load meanwhile, and its
     // reloads destroy the execution context under an in-flight evaluate: keep polling then).
@@ -255,15 +284,17 @@ export async function captureScreenshot(o: ShotOptions): Promise<ShotResult> {
       const full = Math.max(1, r.result?.value ?? viewportHeight)
       truncated = full > maxHeight
       height = Math.min(full, maxHeight)
-      if (height !== viewportHeight) {
-        await metrics(height)
-        await sleep(300, o.signal)
-      }
     }
-    const shot = (await send('Page.captureScreenshot', { format: 'png', clip: { x: 0, y: 0, width: o.width, height, scale: 1 } })) as { data: string }
+    // The viewport keeps its height: resizing it to the page height would also stretch
+    // `height: 100vh` sections and push the rest of the page out of the clip.
+    const shot = (await send('Page.captureScreenshot', {
+      format: 'png',
+      captureBeyondViewport: height > viewportHeight,
+      clip: { x: 0, y: 0, width: o.width, height, scale: 1 },
+    })) as { data: string }
     mkdirSync(dirname(o.out), { recursive: true })
     writeFileSync(o.out, Buffer.from(shot.data, 'base64'))
-    return { file: o.out, width: o.width, height, truncated, pageState, consoleErrors: consoleErrors.slice(0, 5).map((e) => e.slice(0, 400)) }
+    return { file: o.out, width: o.width, height, truncated, pageState, consoleErrors: consoleErrors.slice(0, MAX_CONSOLE_ERRORS).map((e) => e.slice(0, 400)) }
   } finally {
     cdp?.close()
     if (proc && proc.exitCode === null) {

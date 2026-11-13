@@ -90,7 +90,7 @@ export function defaultPrefsFile(): string {
 export function sanitizePrefs(v: unknown): StoredPrefs | undefined {
   const p = v as Partial<Record<keyof StoredPrefs, unknown>> | null
   if (!p || typeof p !== 'object') return undefined
-  if (!(THEMES as readonly unknown[]).includes(p.theme) || typeof p.dark !== 'boolean' || typeof p.width !== 'string' || !(p.width in WIDTHS)) return undefined
+  if (!(THEMES as readonly unknown[]).includes(p.theme) || typeof p.dark !== 'boolean' || typeof p.width !== 'string' || !Object.hasOwn(WIDTHS, p.width)) return undefined
   return { theme: p.theme as string, dark: p.dark, width: p.width }
 }
 

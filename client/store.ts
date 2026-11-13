@@ -28,7 +28,7 @@ export function parsePrefs(raw: string | null): PreviewPrefs {
     return {
       theme: (THEMES as readonly unknown[]).includes(v.theme) ? (v.theme as ThemeName) : DEFAULT_PREFS.theme,
       dark: typeof v.dark === 'boolean' ? v.dark : DEFAULT_PREFS.dark,
-      width: typeof v.width === 'string' && v.width in WIDTHS ? (v.width as WidthName) : DEFAULT_PREFS.width,
+      width: typeof v.width === 'string' && Object.hasOwn(WIDTHS, v.width) ? (v.width as WidthName) : DEFAULT_PREFS.width,
     }
   } catch {
     return DEFAULT_PREFS

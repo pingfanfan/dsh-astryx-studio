@@ -67,3 +67,14 @@ describe('originOf (preview message trust)', () => {
     expect(originOf('not a url')).toBeUndefined()
   })
 })
+
+describe('prefs width check', () => {
+  it('rejects inherited property names as widths', async () => {
+    const { sanitizePrefs } = await import('../src/gallery.js')
+    for (const width of ['constructor', 'toString', '__proto__']) {
+      expect(sanitizePrefs({ theme: 'neutral', dark: false, width })).toBeUndefined()
+      expect(parsePrefs(JSON.stringify({ theme: 'neutral', dark: false, width })).width).toBe(DEFAULT_PREFS.width)
+    }
+    expect(sanitizePrefs({ theme: 'neutral', dark: false, width: 'mobile' })?.width).toBe('mobile')
+  })
+})
