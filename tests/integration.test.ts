@@ -93,6 +93,22 @@ describe.runIf(process.env.ASTRYX_E2E === '1')('real preview Vite', () => {
     expect(secret.status).toBe(403)
     const pkg = await fetch(url + '@fs' + join(v.workspace, 'package.json'))
     expect(pkg.status).toBe(403)
+
+    // The generated harness really runs in a browser: the page reports ready (locale provider
+    // mirrored from the scaffold's zh-CN entry), and a missing page reports error at once.
+    const { captureScreenshot, findChrome } = await import('../src/preview/shot.js')
+    const { previewQuery } = await import('../src/shared/preview-protocol.js')
+    expect(readFileSync(join(v.workspace, '.astryx-studio/main.tsx'), 'utf8')).toContain('<InternationalizationProvider locale="zh-CN"')
+    const chrome = findChrome()
+    if (chrome) {
+      const out = join(v.workspace, '.astryx-studio/shots/e2e.png')
+      const shot = await captureScreenshot({ chrome, url: url + previewQuery(v.file, 'neutral', false), width: 390, out })
+      console.log('screenshot', JSON.stringify({ ...shot, file: undefined }))
+      expect(shot).toMatchObject({ width: 390, pageState: 'ready' })
+      expect(shot.height).toBeGreaterThan(900)
+      const missing = await captureScreenshot({ chrome, url: url + previewQuery('src/pages/nope/page.tsx', 'neutral', false), width: 800, fullPage: false, out })
+      expect(missing.pageState).toBe('error')
+    } else console.log('no Chrome-family browser: screenshot checks skipped')
     m.stopAll()
     await new Promise((r) => setTimeout(r, 300))
     expect(children.every((c) => c.killed || c.exitCode !== null)).toBe(true)

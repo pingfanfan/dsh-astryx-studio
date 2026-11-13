@@ -54,6 +54,8 @@ export class PreviewManager {
   private readonly sessions = new Map<string, SessionState>()
   private readonly servers = new Map<string, PreviewServer>()
   private readonly verify = new Map<string, VerifyStatus>()
+  /** Workspaces whose Vite restarts once its current start finishes (an install landed meanwhile). */
+  private readonly restartPending = new Set<string>()
   private spawner: Spawner | undefined
   /** Finds a session's workspace when the manager has not seen it yet (e.g. after a DSH restart). */
   private resolver: ((sessionId: string) => Promise<string | undefined>) | undefined
@@ -108,7 +110,17 @@ export class PreviewManager {
   packagesInstalled(workspace: string): boolean {
     const server = this.servers.get(workspace)
     if (server?.status().state === 'starting') {
-      void server.ensure().then(() => this.packagesInstalled(workspace))
+      // One deferred restart per start, however many installs land meanwhile.
+      if (!this.restartPending.has(workspace)) {
+        this.restartPending.add(workspace)
+        void server
+          .ensure()
+          .catch(() => undefined)
+          .then(() => {
+            this.restartPending.delete(workspace)
+            this.packagesInstalled(workspace)
+          })
+      }
       return true
     }
     if (!this.stopForInstall(workspace)) return false

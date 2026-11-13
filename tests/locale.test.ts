@@ -39,8 +39,8 @@ describe('built-in component locale', () => {
     writePreviewHarness(ws)
     const read = () => readFileSync(join(ws, PREVIEW_DIR, 'main.tsx'), 'utf8')
     expect(read()).not.toContain('InternationalizationProvider') // core's zh-CN locale is not installed here
-    mkdirSync(join(ws, 'node_modules/@astryxdesign/core/locales'), { recursive: true })
-    writeFileSync(join(ws, 'node_modules/@astryxdesign/core/locales/zh-CN.json'), '{}')
+    mkdirSync(join(ws, 'node_modules/@astryxdesign/core/dist/i18n/generated-locales'), { recursive: true })
+    writeFileSync(join(ws, 'node_modules/@astryxdesign/core/dist/i18n/generated-locales/zh-CN.generated.js'), 'export default {}')
     writePreviewHarness(ws)
     expect(read()).toContain(`<InternationalizationProvider locale="zh-CN" messages={{'zh-CN': localeMessages}}><Page /></InternationalizationProvider>`)
     writeFileSync(join(ws, 'src/main.tsx'), scaffoldFiles('app', '')['src/main.tsx']!)

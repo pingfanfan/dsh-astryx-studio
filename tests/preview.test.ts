@@ -450,12 +450,37 @@ describe('review fixes', () => {
     m.stopAll()
   })
 
+  it('two installs while Vite starts cause one restart, not two', async () => {
+    const ws = tempProject()
+    const { m, runner, procs } = manager()
+    m.templateWritten('s1', ws, 'src/pages/main/page.tsx')
+    await vi.waitFor(() => expect(runner.calls).toHaveLength(1))
+    runner.calls[0]!.resolve(ok())
+    await vi.waitFor(() => expect(procs).toHaveLength(1))
+    expect(m.packagesInstalled(ws)).toBe(true)
+    expect(m.packagesInstalled(ws)).toBe(true)
+    procs[0]!.emit(READY(40400))
+    await vi.waitFor(() => expect(runner.calls).toHaveLength(2))
+    runner.calls[1]!.resolve(ok())
+    await vi.waitFor(() => expect(procs).toHaveLength(2))
+    procs[1]!.emit(READY(40401))
+    await vi.waitFor(() => expect(m.status('s1').preview.url).toBe('http://127.0.0.1:40401/'))
+    await new Promise((r) => setTimeout(r, 50))
+    expect(procs).toHaveLength(2)
+    expect(procs[1]!.terminated).toBe(false)
+    m.stopAll()
+  })
+
   it('harness: any file name under the workspace is a page; a page that does not compile shows its error', () => {
     const main = previewFiles('/w')[`${PREVIEW_DIR}/main.tsx`]!
     const check = /if \((.+)\) return 'missing';\n  \/\/ Vite answers 404/.exec(main) ?? /  if (\(!\/.+) return 'missing';/.exec(main)
     expect(check).not.toBeNull()
     expect(main).toContain("page.includes('\\\\')")
-    expect(main).toContain('if (probe.status >= 500) throw new CompileError(await compileMessage(probe));')
+    expect(main).toContain('if (probe.status === 500) throw new CompileError(await compileMessage(probe));')
+    // 502-504 (Vite re-optimizing or restarting) are transient: the message hits the retry pattern.
+    expect(main).toContain("if (probe.status > 500) throw new Error('Outdated Optimize Dep (HTTP ' + probe.status + ')');")
+    const retry = new Function(`return ${/const FETCH_ERROR = (\/.+\/i);/.exec(main)![1]}`)() as RegExp
+    expect(retry.test('Outdated Optimize Dep (HTTP 504)')).toBe(true)
     expect(main).toContain('/const error = (\\{.*?\\});?\\s*\\n/s')
     expect(main).toContain("reportError(error instanceof CompileError ? 'vite' : 'render', error);")
     // The generated page check accepts Chinese and spaces and refuses escapes.

@@ -98,7 +98,9 @@ async function loadPage(page: string): Promise<{default?: ComponentType} | 'miss
   const probe = await fetch(pageUrl(page));
   // A page that exists but does not compile: Vite answers 500 with its error page, which carries
   // the error as JSON. Surface it at once (it is the model's bug, not a transient state).
-  if (probe.status >= 500) throw new CompileError(await compileMessage(probe));
+  if (probe.status === 500) throw new CompileError(await compileMessage(probe));
+  // 502-504: Vite re-optimizing dependencies or restarting ("Outdated Optimize Dep"): retried.
+  if (probe.status > 500) throw new Error('Outdated Optimize Dep (HTTP ' + probe.status + ')');
   if (probe.status === 404 || !(probe.headers.get('content-type') ?? '').includes('javascript')) return 'missing';
   return import(/* @vite-ignore */ pageUrl(page));
 }
@@ -332,7 +334,8 @@ export function writePreviewHarness(workspace: string): string[] {
   } catch {
     locale = undefined
   }
-  if (locale && !existsSync(join(workspace, 'node_modules', '@astryxdesign', 'core', 'locales', `${locale}.json`))) locale = undefined
+  // The module the entry and the harness import (`locales/<id>.generated.js` maps to dist/).
+  if (locale && !existsSync(join(workspace, 'node_modules', '@astryxdesign', 'core', 'dist', 'i18n', 'generated-locales', `${locale}.generated.js`))) locale = undefined
   for (const [rel, text] of Object.entries(previewFiles(workspace, locale))) {
     const file = join(workspace, rel)
     if (existsSync(file) && readFileSync(file, 'utf8') === text) continue

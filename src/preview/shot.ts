@@ -94,6 +94,8 @@ class Cdp {
   }
 
   send(method: string, params: Record<string, unknown> = {}, sessionId?: string): Promise<Record<string, unknown>> {
+    // A closed socket drops sends silently: fail fast instead of waiting for the tool timeout.
+    if (this.ws.readyState !== WebSocket.OPEN) return Promise.reject(new Error('DevTools connection closed'))
     const id = ++this.id
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject })
@@ -230,7 +232,9 @@ export async function captureScreenshot(o: ShotOptions): Promise<ShotResult> {
       try {
         const r = (await send('Runtime.evaluate', { expression: 'document.documentElement.dataset.astryxStudio || ""', returnByValue: true })) as { result?: { value?: string } }
         v = r.result?.value
-      } catch {
+      } catch (error) {
+        // Only a harness reload (destroyed / missing execution context) is expected here.
+        if (!/context/i.test(error instanceof Error ? error.message : String(error))) throw error
         v = undefined
       }
       if (v === 'ready' || v === 'error') {
