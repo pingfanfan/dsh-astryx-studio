@@ -64,10 +64,25 @@ describe('preview harness scaffold', () => {
       expect(main).toContain(`import '@astryxdesign/theme-${t}/theme.css';`)
       expect(main).toContain(`import {${t}Theme} from '@astryxdesign/theme-${t}/built';`)
     }
-    for (const s of ["q.get('page')", "q.get('theme')", "q.get('dark')", 'import.meta.glob', "import.meta.hot.on('vite:error'", "addEventListener('error'", "addEventListener('unhandledrejection'", 'componentDidCatch', 'postMessage', "import.meta.hot.on('vite:afterUpdate'", '<Theme theme={THEMES[params.theme]}']) {
+    for (const s of ["q.get('page')", "q.get('theme')", "q.get('dark')", "import.meta.hot.on('vite:error'", "addEventListener('error'", "addEventListener('unhandledrejection'", 'componentDidCatch', 'postMessage', "import.meta.hot.on('vite:afterUpdate'", '<Theme theme={THEMES[params.theme]}']) {
       expect(main).toContain(s)
     }
     expect(main).not.toContain('astryx.css')
+  })
+
+  it('main.tsx loads the page by absolute /@fs URL (pages added while Vite runs still load), and a missing page is a finished state', () => {
+    const main = previewFiles('/Users/me/proj')[`${PREVIEW_DIR}/main.tsx`]!
+    expect(main).not.toMatch(/import\.meta\.glob[<(]/)
+    expect(main).toContain('const WORKSPACE = "/Users/me/proj";')
+    expect(main).toContain('import(/* @vite-ignore */ pageUrl(page))')
+    // Vite answers a missing file with its SPA fallback (index.html, 200): JavaScript or nothing.
+    expect(main).toContain("if (probe.status === 404 || !(probe.headers.get('content-type') ?? '').includes('javascript')) return 'missing';")
+    // Paths that try to leave the workspace are refused before any request.
+    expect(main).toContain("page.split('/').includes('..')")
+    // Windows workspaces become /@fs/C:/… URLs.
+    expect(previewFiles('C:\\Users\\me\\proj')[`${PREVIEW_DIR}/main.tsx`]).toContain('const WORKSPACE = "C:/Users/me/proj";')
+    // Missing page: shown, and marks the page finished for astryx_screenshot.
+    expect(main).toMatch(/setMissing\(params\.page\);\s+document\.documentElement\.dataset\.astryxStudio = 'error';/)
   })
 
   it('main.tsx swaps in the HMR-updated page module, so a rewritten page with a new default component is not left stale', () => {

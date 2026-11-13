@@ -73,7 +73,21 @@ ${themeImports.join('\n')}
 const THEMES = {${THEMES.map((t) => `${t}: ${t}Theme`).join(', ')}} as const;
 type ThemeName = keyof typeof THEMES;
 
-const pages = import.meta.glob<{default: ComponentType}>('../src/**/*.tsx');
+// Pages load by absolute /@fs URL, not import.meta.glob: a glob is fixed when Vite first
+// transforms this file, so a page the model adds later (outside Vite's root) would be missing.
+const WORKSPACE = ${JSON.stringify(workspace.replace(/\\/g, '/'))};
+function pageUrl(page: string): string {
+  return '/@fs' + (WORKSPACE.startsWith('/') ? '' : '/') + WORKSPACE + '/' + page;
+}
+async function loadPage(page: string): Promise<{default?: ComponentType} | 'missing'> {
+  if (!/^[\\w@.\\/-]+\\.tsx?$/.test(page) || page.split('/').includes('..')) return 'missing';
+  // A file that does not exist gets Vite's SPA fallback (index.html, 200) or a 404, never
+  // JavaScript (GET: the transform middleware skips HEAD; the transform is cached, so the
+  // import below reuses it). A network failure throws here and is retried by the caller.
+  const probe = await fetch(pageUrl(page));
+  if (probe.status === 404 || !(probe.headers.get('content-type') ?? '').includes('javascript')) return 'missing';
+  return import(/* @vite-ignore */ pageUrl(page));
+}
 const SOURCE = 'astryx-studio-preview';
 
 // A page module that fails to *fetch* (not to run) is a transient state: packages still
@@ -190,16 +204,18 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const load = pages['../' + params.page];
-    if (!load) {
-      setMissing(params.page);
-      return;
-    }
-    load().then((m) => {
+    loadPage(params.page).then((m) => {
       setRetryCount(0);
-      setMissing(null);
       setWaiting(null);
-      setPage(() => m.default);
+      if (m === 'missing' || !m.default) {
+        // A finished state too: astryx_screenshot captures the message instead of timing out.
+        setMissing(params.page);
+        document.documentElement.dataset.astryxStudio = 'error';
+        return;
+      }
+      setMissing(null);
+      const next = m.default;
+      setPage(() => next);
       // Readiness for astryx_screenshot (headless Chrome polls this attribute).
       document.documentElement.dataset.astryxStudio = 'ready';
       post({type: 'ready', page: params.page});
