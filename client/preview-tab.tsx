@@ -42,6 +42,16 @@ const POLL_MS = 1500
 /** An HMR signal this long before the tab noticed a write still counts for it (the poll lags the write). */
 const HMR_SIGNAL_SLACK_MS = POLL_MS * 2
 
+/** Origin of the preview server URL, undefined when there is none or it does not parse. */
+export function originOf(url: string | undefined): string | undefined {
+  if (!url) return undefined
+  try {
+    return new URL(url).origin
+  } catch {
+    return undefined
+  }
+}
+
 export function iframeUrl(status: SessionStatus | undefined, theme: string, dark: boolean): string | undefined {
   if (!status?.preview.url || !status.page) return undefined
   return status.preview.url + previewQuery(status.page, theme as never, dark)
@@ -57,6 +67,11 @@ export function PreviewView(props: PreviewFace) {
   const p = useSyncExternalStore(prefs.subscribe, prefs.get, prefs.get)
   const [status, setStatus] = useState<SessionStatus | undefined>()
   const [rpcError, setRpcError] = useState<string | undefined>()
+  // Kept apart from rpcError: the next successful poll must not wipe an install failure.
+  const [installError, setInstallError] = useState<string | undefined>()
+  // Polls started before the latest install finished are stale (they could restore needs-install).
+  const requestSeq = useRef(0)
+  const staleBefore = useRef(0)
   const [runtimeError, setRuntimeError] = useState<string | undefined>()
   const [notice, setNotice] = useState<string | undefined>()
   const frame = useRef<HTMLIFrameElement>(null)
@@ -64,18 +79,31 @@ export function PreviewView(props: PreviewFace) {
   // Ask the Host to start Vite once, then poll the status while the tab is mounted.
   useEffect(() => {
     let alive = true
-    const apply = (r: RpcResult) => {
-      if (!alive) return
+    const apply = (r: RpcResult, seq = Number.POSITIVE_INFINITY) => {
+      if (!alive || seq < staleBefore.current) return
       if (r.ok) {
         setStatus(r.value as SessionStatus)
         setRpcError(undefined)
       } else setRpcError(r.error.message)
     }
     void call('openPreview', { sessionId }).then(apply, (e) => alive && setRpcError(String(e)))
-    const timer = setInterval(() => void call('status', { sessionId }).then(apply, () => undefined), POLL_MS)
+    // One poll at a time, and none while the tab is hidden (it stays mounted in the background).
+    let pending = false
+    const poll = () => {
+      if (pending || (typeof document !== 'undefined' && document.hidden)) return
+      pending = true
+      const seq = ++requestSeq.current
+      void call('status', { sessionId })
+        .then((r) => apply(r, seq), () => undefined)
+        .finally(() => (pending = false))
+    }
+    const timer = setInterval(poll, POLL_MS)
+    const onVisible = () => typeof document !== 'undefined' && !document.hidden && poll()
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisible)
     return () => {
       alive = false
       clearInterval(timer)
+      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisible)
     }
   }, [call, sessionId])
 
@@ -104,23 +132,32 @@ export function PreviewView(props: PreviewFace) {
     if (!baseline && seenWrite.current!.at === lastWriteAt) return
     seenWrite.current = { at: lastWriteAt }
     if (baseline || lastWriteAt === undefined) return
-    const noticedAt = Date.now()
+    // The write may be older than when this tab noticed it (a slow or throttled poll); its HMR
+    // update can already have arrived. The Host runs on this machine (the preview is on
+    // 127.0.0.1), so its clock is comparable; with any skew this falls back to noticedAt.
+    const writtenAt = Math.min(Date.now(), lastWriteAt)
     const timer = setTimeout(() => {
-      if (lastSignal.current < noticedAt - HMR_SIGNAL_SLACK_MS) setReloadKey((k) => k + 1)
+      if (lastSignal.current < writtenAt - HMR_SIGNAL_SLACK_MS) setReloadKey((k) => k + 1)
     }, HMR_WATCHDOG_MS)
     return () => clearTimeout(timer)
   }, [hasStatus, lastWriteAt])
 
+  // Only the preview server's origin is trusted: a link in a generated page can navigate the
+  // iframe to another site, whose messages would pass a source check alone.
+  const previewOrigin = useRef<string | undefined>(undefined)
+  previewOrigin.current = originOf(status?.preview.url)
   const sendPrefs = useCallback(() => {
+    const origin = previewOrigin.current
+    if (!origin) return
     const cmd: PreviewCommand = { source: PREVIEW_COMMAND_SOURCE, type: 'set', theme: prefs.get().theme, dark: prefs.get().dark }
-    frame.current?.contentWindow?.postMessage(cmd, '*')
+    frame.current?.contentWindow?.postMessage(cmd, origin)
   }, [prefs])
   useEffect(sendPrefs, [p.theme, p.dark, sendPrefs])
 
   // Messages from the preview page: ready → push prefs; error → show it and report it to the Host.
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
-      if (event.source !== frame.current?.contentWindow) return
+      if (event.source !== frame.current?.contentWindow || event.origin !== previewOrigin.current) return
       const d = event.data as PreviewMessage | undefined
       if (!d || d.source !== PREVIEW_MESSAGE_SOURCE) return
       if (d.type === 'ready') {
@@ -145,16 +182,29 @@ export function PreviewView(props: PreviewFace) {
   const fullUrl = status?.preview.url && status.page ? status.preview.url + previewQuery(status.page, p.theme, p.dark) : undefined
   const [installing, setInstalling] = useState(false)
   const install = async () => {
+    if (installing) return
     setInstalling(true)
+    setInstallError(undefined)
     const r = await call('installPreview', { sessionId }).catch((e: unknown) => ({ ok: false as const, error: { code: 'RPC', message: String(e) } }))
+    // Any poll already on its way started before this result and may carry needs-install.
+    staleBefore.current = requestSeq.current + 1
     setInstalling(false)
     if (r.ok) setStatus(r.value as SessionStatus)
-    else setRpcError(r.error.message)
+    else setInstallError(r.error.message)
   }
+  const [exporting, setExporting] = useState(false)
   const exportHtml = async () => {
+    if (exporting) return
+    setExporting(true)
     setNotice('导出中…')
-    const r = await call('exportHtml', { sessionId })
-    setNotice(r.ok ? `已导出 ${(r.value as { file: string }).file}` : `导出失败：${r.error.message}`)
+    try {
+      const r = await call('exportHtml', { sessionId })
+      setNotice(r.ok ? `已导出 ${(r.value as { file: string }).file}` : `导出失败：${r.error.message}`)
+    } catch (e) {
+      setNotice(`导出失败：${String(e)}`)
+    } finally {
+      setExporting(false)
+    }
   }
   const width = WIDTHS[p.width]
 
@@ -187,7 +237,7 @@ export function PreviewView(props: PreviewFace) {
         <button type="button" style={btn(false)} disabled={!fullUrl} onClick={() => fullUrl && window.open(fullUrl, '_blank', 'noopener')}>
           浏览器打开
         </button>
-        <button type="button" style={btn(false)} disabled={!status?.page} onClick={() => void exportHtml()}>
+        <button type="button" style={btn(false)} disabled={!status?.page || exporting} onClick={() => void exportHtml()}>
           导出 HTML
         </button>
         {props.hasWebReview() && fullUrl ? (
@@ -197,6 +247,11 @@ export function PreviewView(props: PreviewFace) {
         ) : null}
       </div>
       {runtimeError ? <div style={S.errorBar}>预览运行时错误：{runtimeError}</div> : null}
+      {installError ? (
+        <div style={S.errorBar} onClick={() => setInstallError(undefined)}>
+          安装预览依赖失败：{installError}
+        </div>
+      ) : null}
       {notice ? (
         <div style={S.notice} onClick={() => setNotice(undefined)}>
           {notice}

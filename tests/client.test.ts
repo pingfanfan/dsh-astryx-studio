@@ -78,4 +78,48 @@ describe('client bundle', () => {
     disposers.forEach((d) => d())
     vi.useRealTimers()
   })
+
+  function rig(getPrefs: () => Promise<unknown>) {
+    const { mod } = loadClient()
+    const bodies: { key: string; inject: (sessionId: string) => { astryx: Record<string, unknown> } }[] = []
+    const disposers: (() => void)[] = []
+    const sent: unknown[] = []
+    const ctx = {
+      effect: (fn: () => () => void) => disposers.push(fn()),
+      sidebarRightTabs: { register: () => () => {} },
+      slots: { inject: (_s: string, r: () => () => void) => r(), register: (o: (typeof bodies)[number]) => (bodies.push(o), () => {}), entriesOfSlot: () => [] },
+      sidebarRight: { mounted: { getSnapshot: () => undefined, subscribe: () => () => {} }, openTabIn: () => {}, openResourceIn: () => {} },
+      connection: {
+        rpc: {
+          call: async (_c: string, endpoint: string, body: { payload: { prefs?: unknown } }) => {
+            if (endpoint.endsWith('getPrefs')) return getPrefs()
+            if (endpoint.endsWith('setPrefs')) sent.push(body?.payload?.prefs)
+            return { ok: true, value: {} }
+          },
+        },
+      },
+    }
+    ;(mod.apply as (c: typeof ctx) => void)(ctx)
+    const face = bodies.find((b) => b.key === 'dsh-astryx-studio/preview')!.inject('s').astryx
+    const prefs = face.prefs as { get: () => { theme: string; dark: boolean; width: string }; set: (p: object) => void }
+    return { prefs, sent, dispose: () => disposers.forEach((d) => d()) }
+  }
+
+  it('Host prefs are checked like local ones (an unknown width falls back)', async () => {
+    const { prefs, dispose } = rig(async () => ({ ok: true, value: { prefs: { theme: 'stone', dark: true, width: 'phone' } } }))
+    await vi.waitFor(() => expect(prefs.get().theme).toBe('stone'))
+    expect(prefs.get().dark).toBe(true)
+    expect(['desktop', 'tablet', 'mobile']).toContain(prefs.get().width)
+    dispose()
+  })
+
+  it('a toolbar change made before the Host answers is not overwritten', async () => {
+    let answer!: (v: unknown) => void
+    const { prefs, dispose } = rig(() => new Promise((r) => (answer = r)))
+    prefs.set({ theme: 'matcha' })
+    answer({ ok: true, value: { prefs: { theme: 'stone', dark: false, width: 'desktop' } } })
+    await new Promise((r) => setTimeout(r, 10))
+    expect(prefs.get().theme).toBe('matcha')
+    dispose()
+  })
 })

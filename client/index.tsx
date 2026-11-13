@@ -12,7 +12,7 @@ import type { SessionStatus } from '../src/shared/preview-protocol.js'
 import { GalleryBody, type GalleryFace } from './gallery-tab.js'
 import { PreviewBody, rpcCaller, type PreviewFace } from './preview-tab.js'
 import type { PreviewPrefs } from './store.js'
-import { createOpenLedger, createPrefsStore, type KeyValueStorage } from './store.js'
+import { createOpenLedger, createPrefsStore, parsePrefs, type KeyValueStorage } from './store.js'
 
 export const name = 'dsh-astryx-studio/client'
 export const inject = ['slots', 'sidebarRightTabs', 'sidebarRight', 'connection']
@@ -61,17 +61,22 @@ export function apply(ctx: Context) {
   // Toolbar prefs also live on the Host (a file under $DSH_HOME): localStorage is per
   // origin, and DSH web on a new port is a new origin. Host value wins at start-up.
   let applyingRemote = false
+  // A change the user makes before the Host answers wins (it is already on its way to the Host).
+  let changedLocally = false
   void call('getPrefs', { sessionId: 'prefs' }).then((r) => {
     const remote = r.ok ? (r.value as { prefs: PreviewPrefs | null }).prefs : null
-    if (!remote) return
+    if (!remote || changedLocally) return
     applyingRemote = true
-    prefs.set(remote)
+    // Checked like localStorage: an old or hand-edited prefs file must not set width "phone".
+    prefs.set(parsePrefs(JSON.stringify(remote)))
     applyingRemote = false
   }, () => undefined)
   ctx.effect(
     () =>
       prefs.subscribe(() => {
-        if (!applyingRemote) void call('setPrefs', { sessionId: 'prefs', prefs: prefs.get() }).catch(() => undefined)
+        if (applyingRemote) return
+        changedLocally = true
+        void call('setPrefs', { sessionId: 'prefs', prefs: prefs.get() }).catch(() => undefined)
       }),
     'astryx-studio: prefs sync',
   )
@@ -140,9 +145,19 @@ export function apply(ctx: Context) {
   // astryx_template asks for the tab by bumping openSeq; open it in the foreground session.
   ctx.effect(() => {
     let stopped = false
+    let pending = false
     const check = async () => {
       const sessionId = sidebar.mounted.getSnapshot()
-      if (!sessionId || stopped) return
+      // Not while the page is hidden, and one call at a time against a slow Host.
+      if (!sessionId || stopped || pending || (typeof document !== 'undefined' && document.hidden)) return
+      pending = true
+      try {
+        await checkOnce(sessionId)
+      } finally {
+        pending = false
+      }
+    }
+    const checkOnce = async (sessionId: string) => {
       const r = (await call('status', { sessionId }).catch(() => undefined)) as
         | { ok: true; value: SessionStatus }
         | { ok: false }

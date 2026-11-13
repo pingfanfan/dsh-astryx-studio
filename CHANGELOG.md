@@ -21,6 +21,13 @@ Found by testing 0.1.0 end to end in DSH; details and before/after runs in [docs
 - The tab reloads the iframe if a model write gets no HMR update within 4 s.
 - The gallery's "no matching templates" message sat at the bottom of an empty grid. It now sits under the toolbar, with a clear-search button.
 - A page that does not compile now shows its error in the preview, instead of "No page at …". Page paths may contain Chinese or spaces, and Windows paths work.
+- Preview and gallery tab fixes from a review of the client:
+  - The tab polls the Host only while it is visible, one call at a time; so does the watcher that opens the tab.
+  - A status poll that was already under way can no longer undo a finished install and bring the install button back.
+  - An install failure stays on screen until dismissed, instead of vanishing at the next poll.
+  - "导出中…" and "正在发送…" can no longer get stuck when a call fails, and a double-click on a gallery card sends one turn, not two.
+  - The tab no longer reloads an up-to-date preview when it noticed a write late.
+  - Toolbar settings from the Host are checked before use, and a change made while they load is kept.
 - Preview server fixes from a review of its start-up and restart logic:
   - Vite's output was scanned for the port line for its whole lifetime, re-reading an ever-growing buffer on every HMR message. Scanning now stops once Vite reports its port.
   - A preview that failed to start revives when packages are installed from the shell, instead of staying on the old error.
@@ -55,6 +62,7 @@ Found by an independent security review; none critical.
 - **Installs into other people's projects need approval.** In a project the plugin did not create, the preview no longer adds packages to its `package.json` on its own. The tab lists the missing packages, and installs them only when the user clicks the button. `astryx_screenshot` tells the model to ask the user. In such a project, `astryx_template` also asks through DSH's approval card, because writing a template may add its packages. Scaffolded projects ship every preview package and never see the prompt.
 - **Installs run no project code.** Installs into a workspace run with `--ignore-scripts` (and `--ignore-pnpmfile` with pnpm), so a cloned project's lifecycle scripts or `.pnpmfile.cjs` do not run.
 - **Model-supplied paths are checked against real paths,** so a symlink in the workspace cannot redirect a write. Template and render targets must be `.tsx` under `src/`, and exports `.html`, never in `node_modules` or a dot-folder.
+- **The preview tab trusts only the preview server.** Messages are accepted only from the preview server's origin, and theme commands are sent only to it. A link in a generated page that navigates the preview elsewhere can no longer feed text to the model as a "runtime error".
 - **Page output is marked as data.** Runtime errors and screenshot console errors reach the model fenced and labelled as page output, with control characters removed.
 
 ## 0.1.0 — 2026-11-08

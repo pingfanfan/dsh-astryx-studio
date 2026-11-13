@@ -3,7 +3,7 @@
  * category filter and a search box. Clicking a card asks the Host to queue
  * 「用 `<id>` 模板开始」 as an ordinary user turn: the model still answers it.
  */
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import type { RpcCall } from './preview-tab.js'
 import { expandSearchWord } from '../src/shared/zh-terms.js'
 
@@ -65,10 +65,20 @@ export function GalleryView({ sessionId, call }: GalleryFace) {
   }, [call, sessionId])
 
   const shown = useMemo(() => filterGallery(items ?? [], category, query), [items, category, query])
+  // One send at a time: a double-click must not queue two "用 X 模板开始" turns.
+  const sending = useRef(false)
   const start = async (item: GalleryItem) => {
+    if (sending.current) return
+    sending.current = true
     setNotice(`正在发送「用 ${item.id} 模板开始」…`)
-    const r = await call('startTemplate', { sessionId, id: item.id })
-    setNotice(r.ok ? `已发送「用 ${item.id} 模板开始」，模型会接着处理。` : `发送失败：${r.error.message}`)
+    try {
+      const r = await call('startTemplate', { sessionId, id: item.id })
+      setNotice(r.ok ? `已发送「用 ${item.id} 模板开始」，模型会接着处理。` : `发送失败：${r.error.message}`)
+    } catch (e) {
+      setNotice(`发送失败：${String(e)}`)
+    } finally {
+      sending.current = false
+    }
   }
 
   if (error) return <div style={S.empty}>无法加载模板：{error}</div>

@@ -58,3 +58,12 @@ describe('preview tab text helpers', () => {
     expect(verifyText({ ...base, preview: { state: 'idle', log: [] }, verify: { state: 'fail', summary: 'astryx verify ✗ (tsc 0.6s) · page.tsx:3 TS2322', at: 1 } })).toContain('TS2322')
   })
 })
+
+describe('originOf (preview message trust)', () => {
+  it('gives the preview server origin, or undefined', async () => {
+    const { originOf } = await import('../client/preview-tab.js')
+    expect(originOf('http://127.0.0.1:5173/')).toBe('http://127.0.0.1:5173')
+    expect(originOf(undefined)).toBeUndefined()
+    expect(originOf('not a url')).toBeUndefined()
+  })
+})
