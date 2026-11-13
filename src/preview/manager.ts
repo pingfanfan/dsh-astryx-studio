@@ -10,7 +10,7 @@ import type { Runner } from '../proc.js'
 import type { PreviewStatus, SessionStatus, VerifyStatus } from '../shared/preview-protocol.js'
 import { installSpec, missingPreviewPackages, writePreviewHarness } from './scaffold.js'
 import { PreviewServer, type Spawner } from './server.js'
-import { addArgs } from '../workspace.js'
+import { addArgs, withInstallLock } from '../workspace.js'
 
 export interface RuntimeErrorReport {
   readonly kind: string
@@ -57,6 +57,8 @@ export class PreviewManager {
   private readonly verify = new Map<string, VerifyStatus>()
   /** Projects whose preview-package install the user approved in the tab (this Host run). */
   private readonly installApproved = new Set<string>()
+  /** Bumped by stopAll(): an ensure() that started before must not start a server after. */
+  private generation = 0
   /** In-flight ensure() per workspace (one install / start at a time). */
   private readonly ensuring = new Map<string, Promise<PreviewStatus>>()
   /** The last failed preview-package install per workspace, shown by status(). */
@@ -117,6 +119,12 @@ export class PreviewManager {
    * @returns true when it restarted (or will restart) the server.
    */
   packagesInstalled(workspace: string): boolean {
+    // A failed preview install the user then fixed in the shell: retry now.
+    if (this.installError.has(workspace)) {
+      this.installError.delete(workspace)
+      void this.ensure(workspace)
+      return true
+    }
     const server = this.servers.get(workspace)
     if (server?.status().state === 'starting') {
       // One deferred restart per start, however many installs land meanwhile.
@@ -172,13 +180,19 @@ export class PreviewManager {
     // and a screenshot can all ask while a minutes-long install is still running.
     const inflight = this.ensuring.get(workspace)
     if (inflight) return inflight
-    const p = this.ensureOnce(workspace).finally(() => this.ensuring.delete(workspace))
+    const p: Promise<PreviewStatus> = this.ensureOnce(workspace).finally(() => {
+      // Only our own entry: a restart may already have put a newer ensure in the slot.
+      if (this.ensuring.get(workspace) === p) this.ensuring.delete(workspace)
+    })
     this.ensuring.set(workspace, p)
     return p
   }
 
   private async ensureOnce(workspace: string): Promise<PreviewStatus> {
     if (!this.spawner) return { state: 'unavailable', error: 'ctx.subprocess is not available in this profile', log: [] }
+    // stopAll() (plugin disposed, subprocess gone) during a minutes-long install bumps this, and
+    // nothing may start afterwards: the Vite would run untracked and never be killed.
+    const generation = this.generation
     this.installError.delete(workspace)
     let server = this.servers.get(workspace)
     if (!server) {
@@ -197,17 +211,31 @@ export class PreviewManager {
     this.installPending.delete(workspace)
     writePreviewHarness(workspace)
     if (missing.length > 0) {
-      const r = await this.opts.run('pnpm', addArgs('pnpm', missing.map(installSpec)), { cwd: workspace, timeoutMs: this.opts.installTimeoutMs })
-      if (r.code !== 0) {
-        const npm = await this.opts.run('npm', addArgs('npm', missing.map(installSpec)), { cwd: workspace, timeoutMs: this.opts.installTimeoutMs })
-        if (npm.code !== 0) {
-          // Kept for status(): the server never started, so it would otherwise just say "idle".
-          const failed: PreviewStatus = { state: 'error', error: `installing ${missing.join(', ')} failed: ${(npm.stderr || r.stderr).slice(-400)}`, log: [] }
-          this.installError.set(workspace, failed)
-          return failed
-        }
+      const failed = await withInstallLock(workspace, async (): Promise<PreviewStatus | undefined> => {
+        // runProcess rejects when it cannot spawn (no pnpm on PATH): treat that as a failure
+        // too, never as a rejection escaping the `void ensure()` callers.
+        const tryRun = (pm: 'pnpm' | 'npm') =>
+          this.opts.run(pm, addArgs(pm, missing.map(installSpec)), { cwd: workspace, timeoutMs: this.opts.installTimeoutMs }).catch((e: unknown) => ({
+            code: -1,
+            stdout: '',
+            stderr: e instanceof Error ? e.message : String(e),
+            timedOut: false,
+            aborted: false,
+            ms: 0,
+          }))
+        const r = await tryRun('pnpm')
+        if (r.code === 0) return undefined
+        const npm = await tryRun('npm')
+        if (npm.code === 0) return undefined
+        return { state: 'error', error: `installing ${missing.join(', ')} failed: ${(npm.stderr || r.stderr).slice(-400)}`, log: [] }
+      })
+      if (failed) {
+        // Kept for status(): the server never started, so it would otherwise just say "idle".
+        this.installError.set(workspace, failed)
+        return failed
       }
     }
+    if (generation !== this.generation) return { state: 'idle', log: [] }
     return server.ensure()
   }
 
@@ -299,8 +327,10 @@ export class PreviewManager {
   }
 
   stopAll(): void {
+    this.generation++
     for (const server of this.servers.values()) server.stop()
     this.servers.clear()
+    this.ensuring.clear()
   }
 }
 

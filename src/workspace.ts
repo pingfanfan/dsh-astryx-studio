@@ -91,6 +91,24 @@ export function toPosix(path: string): string {
   return path.split(sep).join('/')
 }
 
+const installs = new Map<string, Promise<unknown>>()
+
+/**
+ * Run `fn` while no other plugin install runs in `workspace` (the preview's package install and
+ * astryx_template's both rewrite package.json and the lockfile; concurrent runs can drop one).
+ */
+export async function withInstallLock<T>(workspace: string, fn: () => Promise<T>): Promise<T> {
+  const before = installs.get(workspace) ?? Promise.resolve()
+  const run = before.catch(() => undefined).then(fn)
+  const tail = run.catch(() => undefined)
+  installs.set(workspace, tail)
+  try {
+    return await run
+  } finally {
+    if (installs.get(workspace) === tail) installs.delete(workspace)
+  }
+}
+
 /**
  * Arguments for installing packages into a workspace the plugin may not have created: no
  * lifecycle scripts and no .pnpmfile.cjs from that project run (pnpm already skips

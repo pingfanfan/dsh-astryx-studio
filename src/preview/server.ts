@@ -103,10 +103,19 @@ export class PreviewServer {
 
   private async start(): Promise<PreviewStatus> {
     this.set('starting')
-    const port = await (this.opts.pickPort ?? freePort)()
-    // node_modules/.bin/vite, or `node vite/bin/vite.js` on Windows (no .cmd shim).
-    const argv = [...packageBin(this.opts.workspace, 'vite'), '--config', join(PREVIEW_DIR, 'vite.config.ts'), '--host', '127.0.0.1', '--port', String(port), '--strictPort']
-    const proc = this.opts.spawn(argv, this.opts.workspace)
+    let proc: SpawnedProcess
+    try {
+      const port = await (this.opts.pickPort ?? freePort)()
+      // Stopped while waiting for a port (plugin disposed): spawn nothing.
+      if (this.stopped) return this.status()
+      // node_modules/.bin/vite, or `node vite/bin/vite.js` on Windows (no .cmd shim).
+      const argv = [...packageBin(this.opts.workspace, 'vite'), '--config', join(PREVIEW_DIR, 'vite.config.ts'), '--host', '127.0.0.1', '--port', String(port), '--strictPort']
+      proc = this.opts.spawn(argv, this.opts.workspace)
+    } catch (error) {
+      // A failed port pick or spawn must not leave the tab on "starting" forever.
+      this.set('error', error instanceof Error ? error.message : String(error))
+      return this.status()
+    }
     this.proc = proc
     let buffer = ''
     const ready = new Promise<number>((resolve, reject) => {
@@ -127,6 +136,11 @@ export class PreviewServer {
     })
     try {
       const actual = await ready
+      if (this.stopped || this.proc !== proc) {
+        // stop() ran while Vite was starting: do not come up as "running".
+        proc.terminate()
+        return this.status()
+      }
       this.url = `http://127.0.0.1:${actual}/`
       this.set('running')
     } catch (error) {

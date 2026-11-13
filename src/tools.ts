@@ -10,7 +10,7 @@ import { describeError, PLUGIN_ROOT, SEARCH_DOMAINS, type AstryxApi, type Search
 import type { Config } from './config.js'
 import catalog from './generated/catalog.json' with { type: 'json' }
 import type { Runner } from './proc.js'
-import { addArgs, detectWorkspace, htmlPathInside, isPlaceholder, pagePathInside, pickPackageManager, planInstall, resolveInside, scaffold, toPosix } from './workspace.js'
+import { addArgs, withInstallLock, detectWorkspace, htmlPathInside, isPlaceholder, pagePathInside, pickPackageManager, planInstall, resolveInside, scaffold, toPosix } from './workspace.js'
 import { readFileSync } from 'node:fs'
 import type { TscScheduler } from './verify/tsc.js'
 import { THEMES } from './shared/preview-protocol.js'
@@ -291,11 +291,11 @@ export function createTools(env: ToolEnv): ToolDefinition[] {
         const plan = await planInstall(workspace, readFileSync(target, 'utf8'), data.installCommand, target)
         if (plan.specs.length > 0) {
           const pm = await pickPackageManager(env.config.packageManager, env.run, workspace)
-          const ir = await env.run(pm, addArgs(pm, plan.specs), {
+          const ir = await withInstallLock(workspace, () => env.run(pm, addArgs(pm, plan.specs), {
             cwd: workspace,
             signal: exec.signal,
             timeoutMs: env.config.installTimeoutMs,
-          })
+          }))
           if (ir.code !== 0) {
             throw new Error(`template written, but "${pm} add ${plan.specs.join(' ')}" failed:\n${(ir.stderr || ir.stdout).slice(-1500)}`)
           }

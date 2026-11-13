@@ -626,3 +626,71 @@ describe('third review fixes', () => {
     m.stopAll()
   })
 })
+
+describe('concurrency review fixes', () => {
+  function rig() {
+    const runner = fakeRunner()
+    const procs: string[][] = []
+    const m = new PreviewManager({ run: runner.run, installTimeoutMs: 1000 })
+    m.setSpawner((argv) => (procs.push([...argv]), { onOutput: () => undefined, done: new Promise(() => undefined), terminate: () => undefined }))
+    return { m, runner, procs }
+  }
+
+  it('stopAll during an install: nothing starts afterwards', async () => {
+    const ws = tempProject()
+    const { m, runner, procs } = rig()
+    m.allowInstall(ws)
+    const p = m.ensure(ws)
+    await vi.waitFor(() => expect(runner.calls).toHaveLength(1))
+    m.stopAll() // plugin disposed mid-install
+    runner.calls[0]!.resolve(ok())
+    expect((await p).state).toBe('idle')
+    await tick()
+    expect(procs).toHaveLength(0)
+  })
+
+  it('a spawn that throws (or a port pick that fails) ends in error, not an endless "starting"', async () => {
+    const throwing = new PreviewServer({ workspace: '/w', spawn: () => { throw new Error('subprocess revoked') }, pickPort: async () => 41000 })
+    expect(await throwing.ensure()).toMatchObject({ state: 'error', error: 'subprocess revoked' })
+    const noPort = new PreviewServer({ workspace: '/w', spawn: () => { throw new Error('unreachable') }, pickPort: async () => { throw new Error('no free port') } })
+    expect(await noPort.ensure()).toMatchObject({ state: 'error', error: 'no free port' })
+  })
+
+  it('stop() while waiting for a port spawns nothing', async () => {
+    let release!: (p: number) => void
+    let spawned = 0
+    const s = new PreviewServer({ workspace: '/w', spawn: () => (spawned++, { onOutput: () => undefined, done: new Promise(() => undefined), terminate: () => undefined }), pickPort: () => new Promise<number>((r) => (release = r)) })
+    const p = s.ensure()
+    s.stop()
+    release(41001)
+    await p
+    expect(spawned).toBe(0)
+    expect(s.status().state).toBe('idle')
+  })
+
+  it('a missing pnpm (spawn rejects) becomes an install error, not an unhandled rejection', async () => {
+    const ws = tempProject()
+    const m = new PreviewManager({ run: async () => { throw new Error('spawn pnpm ENOENT') }, installTimeoutMs: 1000 })
+    m.setSpawner(() => ({ onOutput: () => undefined, done: new Promise(() => undefined), terminate: () => undefined }))
+    m.allowInstall(ws)
+    const r = await m.ensure(ws)
+    expect(r.state).toBe('error')
+    expect(r.error).toContain('ENOENT')
+  })
+
+  it('the preview install and a template install never run at once in one workspace', async () => {
+    const { withInstallLock } = await import('../src/workspace.js')
+    const order: string[] = []
+    let releaseA!: () => void
+    const a = withInstallLock('/w', () => new Promise<void>((r) => { order.push('a start'); releaseA = () => { order.push('a end'); r() } }))
+    const b = withInstallLock('/w', async () => { order.push('b start') })
+    await tick()
+    expect(order).toEqual(['a start'])
+    releaseA()
+    await Promise.all([a, b])
+    expect(order).toEqual(['a start', 'a end', 'b start'])
+    // A failing install does not block the next one.
+    await expect(withInstallLock('/w', async () => { throw new Error('boom') })).rejects.toThrow('boom')
+    expect(await withInstallLock('/w', async () => 'next')).toBe('next')
+  })
+})
