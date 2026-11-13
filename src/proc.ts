@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { launch } from './platform.js'
+import { launch, treeKill } from './platform.js'
 
 export interface RunResult {
   readonly code: number | null
@@ -47,7 +47,15 @@ export const runProcess: Runner = (command, args, options) =>
     let force: ReturnType<typeof setTimeout> | undefined
     const kill = () => {
       if (child.exitCode !== null || child.signalCode !== null) return
-      child.kill('SIGTERM')
+      const tree = child.pid !== undefined ? treeKill(child.pid) : undefined
+      if (tree) {
+        // Windows: the process tree, or cmd.exe dies and the pnpm under it keeps running.
+        try {
+          spawn(tree.command, tree.args, { stdio: 'ignore', windowsHide: true }).on('error', () => child.kill())
+        } catch {
+          child.kill()
+        }
+      } else child.kill('SIGTERM')
       // A child that ignores SIGTERM must not hold the caller forever.
       force ??= setTimeout(() => {
         if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL')

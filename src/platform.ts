@@ -11,8 +11,9 @@
  * Everything here is a no-op on macOS and Linux. NOT YET RUN ON WINDOWS: the
  * command lines are unit-tested only.
  *
- * Known limit (same as cross-spawn): a timeout or abort kills cmd.exe, not the
- * pnpm / npm process tree under it; that would need `taskkill /T /F`.
+ * A timeout or abort on Windows kills the whole process tree with
+ * `taskkill /T /F` (see treeKill), since killing cmd.exe alone would leave the
+ * pnpm / npm under it running.
  */
 import { join } from 'node:path'
 
@@ -43,6 +44,16 @@ export function launch(command: string, args: readonly string[], platform: NodeJ
   if (platform !== 'win32' || !bare) return { command, args: [...args] }
   const line = [command.replace(CMD_META, '^$1'), ...args.map(quoteWindowsArg)].join(' ')
   return { command: env['ComSpec'] ?? 'cmd.exe', args: ['/d', '/s', '/c', `"${line}"`], windowsVerbatimArguments: true }
+}
+
+/**
+ * How to stop process `pid` and everything it started, where a plain kill would miss children:
+ * on Windows `taskkill /T /F` (kill only reaches cmd.exe, not the pnpm under it). Undefined
+ * elsewhere: SIGTERM / SIGKILL on the child is enough there.
+ */
+export function treeKill(pid: number, platform: NodeJS.Platform = process.platform): Launch | undefined {
+  if (platform !== 'win32' || !Number.isInteger(pid) || pid <= 0) return undefined
+  return { command: 'taskkill', args: ['/pid', String(pid), '/T', '/F'] }
 }
 
 /**

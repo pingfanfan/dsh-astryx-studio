@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { launch, packageBin, quoteWindowsArg } from '../src/platform.js'
+import { launch, packageBin, quoteWindowsArg, treeKill } from '../src/platform.js'
 import { tscArgs } from '../src/verify/tsc.js'
 
 describe('launching on macOS / Linux (unchanged)', () => {
@@ -54,5 +54,12 @@ describe('launching on Windows (command lines only; not run on Windows yet)', ()
     expect(t.command).toBe('node')
     expect(t.args[0]).toBe(join(ws, 'node_modules', 'typescript', 'bin', 'tsc'))
     expect(t.args).toContain('--noEmit')
+  })
+
+  it('stops a process tree with taskkill /T /F on Windows only', () => {
+    expect(treeKill(1234, 'win32')).toEqual({ command: 'taskkill', args: ['/pid', '1234', '/T', '/F'] })
+    expect(treeKill(1234, 'darwin')).toBeUndefined()
+    expect(treeKill(1234, 'linux')).toBeUndefined()
+    expect(treeKill(0, 'win32')).toBeUndefined()
   })
 })
