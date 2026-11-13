@@ -26,17 +26,26 @@ export interface GalleryItem {
 
 const IDS = new Set(catalog.templates.map((t) => t.id))
 
+/** The shipped thumbnail for a template: WebP (about 60% smaller), else a PNG (older checkouts). */
+function thumbFile(thumbDir: string, id: string): { file: string; type: string } | undefined {
+  for (const [ext, type] of [['webp', 'image/webp'], ['png', 'image/png']] as const) {
+    const file = join(thumbDir, `${id}.${ext}`)
+    if (existsSync(file)) return { file, type }
+  }
+  return undefined
+}
+
 export function galleryItems(thumbDir = THUMB_DIR): GalleryItem[] {
   return catalog.templates.map((t) => ({
     id: t.id,
     name: t.name,
     category: t.category,
     description: t.description,
-    ...(existsSync(join(thumbDir, `${t.id}.png`)) ? { thumb: `${THUMB_PATH}?id=${encodeURIComponent(t.id)}` } : {}),
+    ...(thumbFile(thumbDir, t.id) ? { thumb: `${THUMB_PATH}?id=${encodeURIComponent(t.id)}` } : {}),
   }))
 }
 
-/** GET /api/astryx-studio/thumb?id=<template id> → image/png (owner peer only, via the shared /api channel). */
+/** GET /api/astryx-studio/thumb?id=<template id> → image/webp or image/png (owner peer only, via the shared /api channel). */
 export function thumbRoute(thumbDir = THUMB_DIR): ConnectionFetchRoute {
   return {
     path: THUMB_PATH,
@@ -46,12 +55,12 @@ export function thumbRoute(thumbDir = THUMB_DIR): ConnectionFetchRoute {
       const id = new URL(request.url).searchParams.get('id') ?? ''
       // Only ids from the catalog: never a path the caller chose.
       if (!IDS.has(id)) return new Response('unknown template', { status: 404 })
-      const file = join(thumbDir, `${id}.png`)
-      if (!existsSync(file)) return new Response('no thumbnail', { status: 404 })
-      const body = request.method === 'HEAD' ? null : readFileSync(file)
+      const thumb = thumbFile(thumbDir, id)
+      if (!thumb) return new Response('no thumbnail', { status: 404 })
+      const body = request.method === 'HEAD' ? null : readFileSync(thumb.file)
       return new Response(body, {
         status: 200,
-        headers: { 'content-type': 'image/png', 'cache-control': 'private, max-age=86400', 'x-content-type-options': 'nosniff' },
+        headers: { 'content-type': thumb.type, 'cache-control': 'private, max-age=86400', 'x-content-type-options': 'nosniff' },
       })
     },
   }

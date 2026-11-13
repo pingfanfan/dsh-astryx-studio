@@ -93,7 +93,7 @@ dsh --profile dev --no-open
 
 ## 发布前生成的资源
 
-- `pnpm exec tsx scripts/gen-thumbs.ts`：用 Playwright 重新生成 `assets/thumbs/*.png`（57 张 480×300，约 1 MiB）。
+- `pnpm exec tsx scripts/gen-thumbs.ts`：用 Playwright 和 `cwebp` 重新生成 `assets/thumbs/*.webp`（57 张 480×300，约 0.4 MiB；没装 `cwebp`（`brew install webp`）时保留 PNG）。
 - `node scripts/gen-preview-svg.mjs`：重新生成 `docs/preview.svg` 和 `docs/preview.zh.svg`（Plugin Manager 详情页配图，文字用 Noto Sans CJK SC 转成路径）。
 - `node scripts/gen-catalog.mjs`（`pnpm run build` 会自动运行）：从锁定版本的 CLI 生成 playbook 规则和模板目录。
 

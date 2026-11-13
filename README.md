@@ -93,7 +93,7 @@ Set on the plugin row in a profile patch (`cordis.patch.yml`).
 
 ## Release-time assets
 
-- `pnpm exec tsx scripts/gen-thumbs.ts`: regenerates `assets/thumbs/*.png` (57 × 480×300, about 1 MiB) with Playwright.
+- `pnpm exec tsx scripts/gen-thumbs.ts`: regenerates `assets/thumbs/*.webp` (57 × 480×300, about 0.4 MiB) with Playwright and `cwebp` (`brew install webp`; without it the PNGs are kept).
 - `node scripts/gen-preview-svg.mjs`: regenerates `docs/preview.svg` and `docs/preview.zh.svg` (Plugin Manager detail images, lettering outlined from Noto Sans CJK SC).
 - `node scripts/gen-catalog.mjs` (run by `pnpm run build`): the playbook rules and template catalog from the pinned CLI.
 

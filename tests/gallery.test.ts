@@ -124,12 +124,30 @@ describe('thumbnail route', () => {
     expect((await get('id=../../package.json')).status).toBe(404)
   })
 
-  it('ships a PNG for every page template of the pinned CLI (480x300)', () => {
-    const missing = catalog.templates.filter((t) => !existsSync(join(THUMB_DIR, `${t.id}.png`))).map((t) => t.id)
+  it('serves a WebP when there is one (preferred over a PNG of the same id)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'thumbs-'))
+    writeFileSync(join(dir, 'login.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]))
+    writeFileSync(join(dir, 'login.webp'), Buffer.from('RIFF0000WEBP'))
+    const ok = await thumbRoute(dir).fetch(new Request('http://x/api/astryx-studio/thumb?id=login'))
+    expect(ok.headers.get('content-type')).toBe('image/webp')
+    expect(Buffer.from(await ok.arrayBuffer()).toString('latin1', 8, 12)).toBe('WEBP')
+    expect(galleryItems(dir).find((i) => i.id === 'login')?.thumb).toBeDefined()
+  })
+
+  it('ships a WebP for every page template of the pinned CLI (480x300, ~0.4 MB in all)', () => {
+    const missing = catalog.templates.filter((t) => !existsSync(join(THUMB_DIR, `${t.id}.webp`))).map((t) => t.id)
     expect(missing).toEqual([])
-    const png = readFileSync(join(THUMB_DIR, 'dashboard.png'))
-    expect(png.readUInt32BE(16)).toBe(480)
-    expect(png.readUInt32BE(20)).toBe(300)
+    const webp = readFileSync(join(THUMB_DIR, 'dashboard.webp'))
+    expect(webp.toString('latin1', 0, 4)).toBe('RIFF')
+    expect(webp.toString('latin1', 8, 12)).toBe('WEBP')
+    const chunk = webp.toString('latin1', 12, 16)
+    const [w, h] =
+      chunk === 'VP8X'
+        ? [1 + webp.readUIntLE(24, 3), 1 + webp.readUIntLE(27, 3)]
+        : [webp.readUInt16LE(26) & 0x3fff, webp.readUInt16LE(28) & 0x3fff] // 'VP8 ' (lossy)
+    expect([w, h]).toEqual([480, 300])
+    const total = catalog.templates.reduce((a, t) => a + readFileSync(join(THUMB_DIR, `${t.id}.webp`)).length, 0)
+    expect(total).toBeLessThan(600 * 1024)
     expect(galleryItems().every((i) => i.thumb)).toBe(true)
   })
 })

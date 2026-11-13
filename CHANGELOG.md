@@ -20,6 +20,7 @@ Found by testing 0.1.0 end to end in DSH; details and before/after runs in [docs
 - The gallery's "no matching templates" message sat at the bottom of an empty grid. It now sits under the toolbar, with a clear-search button.
 - A page that does not compile now shows its error in the preview, instead of "No page at …". Page paths may contain Chinese or spaces, and Windows paths work.
 - `astryx_screenshot` no longer leaks Chrome when it fails to start, and cleaning up its profile can no longer crash the Host.
+- Gallery thumbnails are WebP: 0.4 MB instead of 1.0 MB, so the package is about 60% smaller.
 - The first preview after a cold start is ready in about 6 s instead of about 12 s. Vite pre-transforms the harness and pages as soon as it starts (`server.warmup`).
 
 ## 0.1.0 — 2026-11-08

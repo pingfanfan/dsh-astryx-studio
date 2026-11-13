@@ -10,7 +10,7 @@
  *   pnpm exec tsx scripts/gen-thumbs.ts            # all templates
  *   pnpm exec tsx scripts/gen-thumbs.ts login ide  # only these
  */
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -86,9 +86,10 @@ try {
       await page.goto(`${url}?page=${encodeURIComponent(`src/pages/${t.id}/page.tsx`)}&theme=neutral&dark=0`, { waitUntil: 'networkidle', timeout: 120_000 })
       // Let charts, fonts and entrance transitions settle.
       await page.waitForTimeout(1500)
-      const file = join(outDir, `${t.id}.png`)
-      await page.screenshot({ path: file, type: 'png' })
-      console.log(`${t.id}.png ${(statSync(file).size / 1024).toFixed(1)} KiB${errors.length ? `  (page errors: ${errors[0]})` : ''}`)
+      const png = join(outDir, `${t.id}.png`)
+      await page.screenshot({ path: png, type: 'png' })
+      const file = toWebp(png)
+      console.log(`${file.split('/').pop()} ${(statSync(file).size / 1024).toFixed(1)} KiB${errors.length ? `  (page errors: ${errors[0]})` : ''}`)
       if (errors.length) failures.push(`${t.id}: ${errors[0]}`)
     } catch (error) {
       failures.push(`${t.id}: ${error instanceof Error ? error.message : String(error)}`)
@@ -102,10 +103,25 @@ try {
   vite.kill('SIGTERM')
 }
 
+/**
+ * PNG → WebP with cwebp (about 60% smaller for these UI screenshots; JPEG is larger than PNG).
+ * Keeps the PNG, with a warning, where cwebp is not installed (brew install webp).
+ */
+function toWebp(png: string): string {
+  const webp = png.replace(/\.png$/, '.webp')
+  const r = spawnSync('cwebp', ['-quiet', '-q', '82', '-m', '6', png, '-o', webp])
+  if (r.status !== 0) {
+    console.warn(`cwebp unavailable (${r.error?.message ?? r.stderr}); keeping ${png}`)
+    return png
+  }
+  rmSync(png)
+  return webp
+}
+
 const manifest = Object.fromEntries(
   catalog.templates.map((t) => {
     try {
-      return [t.id, statSync(join(outDir, `${t.id}.png`)).size]
+      return [t.id, statSync(join(outDir, `${t.id}.webp`)).size]
     } catch {
       return [t.id, 0]
     }
