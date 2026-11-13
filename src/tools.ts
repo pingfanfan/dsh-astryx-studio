@@ -345,24 +345,32 @@ export function createTools(env: ToolEnv): ToolDefinition[] {
     output: {
       schema: { type: 'json' },
       render: (_a, raw) => {
-        const v = raw as { results?: { domain?: string; name?: string; import?: string; description?: string }[] }
+        const v = raw as { query?: string; translatedFrom?: string; results?: { domain?: string; name?: string; import?: string; description?: string }[] }
         const rows = (v.results ?? []).map(
           (r) => `- [${r.domain}] ${r.name}${r.import ? ` (${r.import})` : ''}: ${r.description ?? ''}`,
         )
-        return text(rows.length ? rows.join('\n') : 'no results')
+        const head = v.translatedFrom ? [`searched "${v.query}" (from "${v.translatedFrom}"; search in English)`] : []
+        return text([...head, ...(rows.length ? rows : ['no results'])].join('\n'))
       },
     },
     isConcurrencySafe: () => true,
     async execute(args, exec) {
-      const query = args.query.trim()
-      if (!query) throw new Error('query must not be empty')
+      const given = args.query.trim()
+      if (!given) throw new Error('query must not be empty')
+      // The CLI search finds nothing for Chinese; known terms become English (表格 -> table).
+      const query = englishKeywords(given)
       const cwd = await readCwd(env, exec)
       const api = await env.api()
       const limit = Math.min(Math.max(args.limit ?? 10, 1), 50)
       const type = args.type as SearchDomain | undefined
       const r = await call('astryx search', () => api.search(query, { cwd, limit, ...(type ? { type } : {}) }))
       const data = r.data as { query?: string; matchCount?: number; results?: unknown[] }
-      return json({ query: data.query ?? query, matchCount: data.matchCount ?? 0, results: (data.results ?? []).slice(0, limit) })
+      return json({
+        query: data.query ?? query,
+        ...(query === given ? {} : { translatedFrom: given }),
+        matchCount: data.matchCount ?? 0,
+        results: (data.results ?? []).slice(0, limit),
+      })
     },
   })
 

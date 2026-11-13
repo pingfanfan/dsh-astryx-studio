@@ -90,6 +90,18 @@ describe('astryx_screenshot', () => {
   })
 })
 
+describe('astryx_search in Chinese', () => {
+  it('searches the English mapping of known Chinese terms and says so', async () => {
+    const { get, exec, api } = setup({ cwd: undefined })
+    const tool = get(TOOL_NAMES.search)
+    const v = await tool.execute({ query: '日期选择' }, exec)
+    expect((api as ReturnType<typeof fakeApi>).calls[0]![1]![0]).toBe('date')
+    expect(v).toMatchObject({ translatedFrom: '日期选择' })
+    expect(JSON.stringify(tool.output?.render?.({} as never, v as never))).toContain('searched \\"date\\" (from \\"日期选择\\"')
+    for (const [zh, en] of [['标签页', 'tabs'], ['弹窗', 'dialog'], ['柱状图', 'bar chart'], ['表格', 'table']] as const) expect(englishKeywords(zh)).toBe(en)
+  })
+})
+
 describe('astryx_build', () => {
   it('maps Chinese keywords to English for the ranker (it cannot match Chinese) and says so', async () => {
     expect(englishKeywords('course sales dashboard')).toBe('course sales dashboard')

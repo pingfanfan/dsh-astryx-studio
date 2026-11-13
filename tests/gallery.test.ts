@@ -63,7 +63,7 @@ describe('Chinese term map', () => {
   it('every term maps to lowercase English words', () => {
     for (const [k, v] of Object.entries(ZH_TERMS)) {
       expect(v.length, k).toBeGreaterThan(0)
-      for (const w of v) expect(w, k).toMatch(/^[a-z][a-z-]*$/)
+      for (const w of v) expect(w, k).toMatch(/^[a-z][a-z-]*(?: [a-z][a-z-]*)?$/)
     }
   })
 })

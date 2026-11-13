@@ -8,6 +8,7 @@ Found by testing 0.1.0 end to end in DSH; details and before/after runs in [docs
 
 - `astryx_screenshot(width?, full_page?, page?, theme?, dark?)`: full-page PNG of the live preview at an exact viewport width through the installed Chrome / Chromium / Edge (DevTools protocol, no Playwright). It returns the path for DSH's `read_image` plus the page's console errors. The prompt tells the model to use it instead of starting its own browser. New option `chromePath`.
 - The template gallery searches in Chinese: 表格, 看板, 登录表单 and similar terms map to the English words the templates use.
+- `astryx_search` does the same: the CLI search found nothing for Chinese (表格, 弹窗, 日期选择: 0 results), and now searches table, dialog, date. The term map gained about 40 component words (日期, 标签页, 开关, 分页, 抽屉…).
 - `astryx_build` maps Chinese keywords to English when the model passes them. The CLI ranker sent every Chinese query to the same fallback template (`shell-top-nav`); 登录页 now finds `login`, 商品详情 finds `product-detail`, 课程 销售 看板 finds `dashboard`.
 - Option `locale` (default `zh-CN`): scaffolded apps wrap the page in `InternationalizationProvider`, so built-in component text (必填/可选, dates) matches the page's language. The preview follows the app's own entry.
 
