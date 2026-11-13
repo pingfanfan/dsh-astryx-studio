@@ -5,7 +5,7 @@ import type { ToolDefinition, ToolRunContext } from '@deepseek-ai/dsh-tools'
 import { PLUGIN_ROOT, type AstryxApi, type CliResponse } from '../src/astryx.js'
 import { DEFAULT_CONFIG } from '../src/config.js'
 import catalog from '../src/generated/catalog.json' with { type: 'json' }
-import { createTools, renderBuild, shapeBuild, TOOL_NAMES, type BuildValue, type ScreenshotArgs, type ScreenshotValue } from '../src/tools.js'
+import { createTools, englishKeywords, renderBuild, shapeBuild, TOOL_NAMES, type BuildValue, type ScreenshotArgs, type ScreenshotValue } from '../src/tools.js'
 import { PLACEHOLDER_SOURCE } from '../src/workspace.js'
 import { createTscScheduler } from '../src/verify/tsc.js'
 import { fakeRunner, ok, tempProject, tick } from './helpers.js'
@@ -91,6 +91,20 @@ describe('astryx_screenshot', () => {
 })
 
 describe('astryx_build', () => {
+  it('maps Chinese keywords to English for the ranker (it cannot match Chinese) and says so', async () => {
+    expect(englishKeywords('course sales dashboard')).toBe('course sales dashboard')
+    expect(englishKeywords('课程 销售 看板')).toBe('dashboard')
+    expect(englishKeywords('商品详情')).toBe('product detail')
+    expect(englishKeywords('聊天助手')).toBe('chat')
+    expect(englishKeywords('看板 revenue')).toBe('dashboard revenue')
+    expect(englishKeywords('量子 纠缠')).toBe('量子 纠缠') // nothing known: passed through
+    const { get, exec, api } = setup({ cwd: undefined })
+    const v = (await get(TOOL_NAMES.build).execute({ keywords: '登录页' }, exec)) as unknown as BuildValue
+    expect((api as ReturnType<typeof fakeApi>).calls[0]![1]![0]).toBe('login')
+    expect(v.translatedFrom).toBe('登录页')
+    expect(renderBuild(v)).toContain('keywords: "login" (from "登录页"; pass English keywords next time)')
+  })
+
   it('shapes the kit; read-only calls without a workspace run in the plugin root', async () => {
     const { get, exec, api } = setup({ cwd: undefined })
     const v = (await get(TOOL_NAMES.build).execute({ keywords: ' course sales dashboard ' }, exec)) as unknown as BuildValue

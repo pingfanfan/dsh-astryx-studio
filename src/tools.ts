@@ -14,6 +14,7 @@ import { detectWorkspace, isPlaceholder, pickPackageManager, planInstall, resolv
 import { readFileSync } from 'node:fs'
 import type { TscScheduler } from './verify/tsc.js'
 import { THEMES } from './shared/preview-protocol.js'
+import { expandSearchWord } from './shared/zh-terms.js'
 
 export interface ToolEnv {
   readonly api: () => Promise<AstryxApi>
@@ -113,6 +114,8 @@ export interface BuildValue {
   components: string[]
   frame: string[]
   foundation: string[]
+  /** The Chinese keywords the model passed, when `keywords` is their English mapping. */
+  translatedFrom?: string
   /** Present when the ranker had no evidence: every page template, so the model can choose directly. */
   catalog?: { id: string; description: string }[]
   /** Template to use when nothing in `catalog` fits either. */
@@ -144,8 +147,27 @@ export function shapeBuild(keywords: string, data: Record<string, unknown>): Bui
   return value
 }
 
+/**
+ * Keywords for the ranker: English words stay; each Chinese word becomes the first English
+ * word of every known term it contains (课程 销售 看板 -> dashboard). Unknown Chinese is dropped
+ * unless nothing else is left, in which case the input is passed through unchanged.
+ */
+export function englishKeywords(keywords: string): string {
+  const words: string[] = []
+  for (const w of keywords.split(/\s+/).filter(Boolean)) {
+    if (!/[\u3400-\u9fff]/.test(w)) {
+      words.push(w)
+      continue
+    }
+    for (const group of expandSearchWord(w)) if (group.length > 1) words.push(group[1]!)
+  }
+  const unique = [...new Set(words)]
+  return unique.length > 0 ? unique.join(' ') : keywords
+}
+
 export function renderBuild(v: BuildValue): string {
   const lines: string[] = []
+  if (v.translatedFrom) lines.push(`keywords: "${v.keywords}" (from "${v.translatedFrom}"; pass English keywords next time)`)
   if (v.start) {
     lines.push(`start: ${v.start.name} (${v.start.displayName}) [${v.basis}] — ${v.start.description}`)
     lines.push(`why: ${v.start.reason}`)
@@ -190,13 +212,17 @@ export function createTools(env: ToolEnv): ToolDefinition[] {
     output: { schema: { type: 'json' }, render: (_a, v) => text(renderBuild(v as unknown as BuildValue)) },
     isConcurrencySafe: () => true,
     async execute(args, exec) {
-      const keywords = args.keywords.trim()
-      if (!keywords) throw new Error('keywords must not be empty')
+      const given = args.keywords.trim()
+      if (!given) throw new Error('keywords must not be empty')
+      // The ranker cannot match Chinese (every Chinese query falls back to the same template);
+      // known Chinese terms become the English words the templates use.
+      const keywords = englishKeywords(given)
       const cwd = await readCwd(env, exec)
       const api = await env.api()
       const r = await call('astryx build', () => api.build(keywords, { cwd }))
       if (r.type !== 'build.kit') throw new Error(`astryx build returned ${r.type}, expected build.kit`)
-      return json(shapeBuild(keywords, r.data as Record<string, unknown>))
+      const value = shapeBuild(keywords, r.data as Record<string, unknown>)
+      return json(keywords === given ? value : { ...value, translatedFrom: given })
     },
   })
 
