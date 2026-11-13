@@ -38,6 +38,7 @@ Request: 「做一个在线课程销售的后台看板，要看到今日收入�
 | After, run 2 | 「健身房会员管理后台…做完确认一下手机宽度下没有撑破」 | 1 turn, 17 steps, 2.5 min, 715K tokens; the model checked 390 / 768 / 1440 with `astryx_screenshot` + `read_image`. The preview was still stale, which led to the v5 fix above. |
 | After, run 3 | 「餐厅的在线订座页面」 | 4 min 19 s; the preview followed the template rewrite live; four widths checked by screenshot |
 | After, run 4 | 「再做一个独立的"我的预订"页面，放在 src/pages/my-bookings/page.tsx」 while the preview ran | 1 min 20 s; the tab switched to the new page and followed its edits |
+| After, run 5 | 「做一个体检预约表单…只在 1440 截一次图确认」 on a fresh folder, with the `locale` default | 1 turn, 20 steps, 1 min 45 s, 672K tokens; field labels show 「必填」 with no localization code in the page (run 3 spent several steps adding it) |
 
 Also checked by hand:
 
