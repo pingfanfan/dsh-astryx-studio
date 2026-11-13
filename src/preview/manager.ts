@@ -45,12 +45,14 @@ export function installsPackages(command: string, depth = 0): boolean {
       if (installsPackages(m[2]!, depth + 1)) return true
     }
   }
+  // Each flag matches one way only (dashes, then a word character; a value never starts with -):
+  // overlapping alternatives made a command with many flags backtrack exponentially.
   // Quoted text is data (echo "… pnpm add …", commit messages), not a command.
   const bare = command.replace(/(["'])(?:\\.|(?!\1)[^\\])*\1/g, '""')
   return (
-    /(?:^|[\s;&|(])(?:pnpm|npm|yarn|bun)\s+(?:--?[\w-]+(?:[= ]\S+)?\s+)*(?:add|install|i|ci|remove|rm|uninstall|un|update|up|upgrade)(?=\s|$|;|&|\|)/.test(bare) ||
+    /(?:^|[\s;&|(])(?:pnpm|npm|yarn|bun)\s+(?:--?\w[\w-]*(?:=\S+|\s+[^-\s]\S*)?\s+)*(?:add|install|i|ci|remove|rm|uninstall|un|update|up|upgrade)(?=\s|$|;|&|\|)/.test(bare) ||
     // A bare `yarn` (optionally with flags) installs the lockfile.
-    /(?:^|[\s;&|(])yarn(?:\s+--?[\w-]+(?:=\S+)?)*\s*(?=$|;|&|\||\))/.test(bare)
+    /(?:^|[\s;&|(])yarn(?:\s+--?\w[\w-]*(?:=\S+)?)*\s*(?=$|;|&|\||\))/.test(bare)
   )
 }
 export const DEFAULT_PAGE = 'src/pages/main/page.tsx'

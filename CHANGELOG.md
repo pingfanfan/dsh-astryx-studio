@@ -17,7 +17,7 @@ Found by testing 0.1.0 end to end in DSH; details and before/after runs in [docs
 - The preview tab kept showing the template after the model rewrote the page with a different default component. Harness v5 swaps in the HMR-updated page module.
 - Pages created while the preview Vite runs showed "No page at …". Pages now load by absolute `/@fs` URL.
 - The first load could fail with "Failed to fetch dynamically imported module" and send that transient error to the model. Vite now optimizes all dependencies at startup, and fetch failures are retried for about 50 s behind a waiting message before anything is reported.
-- After `astryx_template` or a `bash` command installs packages, the running preview Vite restarts, because Vite caches failed resolutions. A bare `yarn` and installs wrapped in `bash -c "…"` / `sh -c '…'` count too.
+- After `astryx_template` or a `bash` command installs packages, the running preview Vite restarts, because Vite caches failed resolutions. A bare `yarn` and installs wrapped in `bash -c "…"` / `sh -c '…'` count too. Recognising install commands can no longer freeze the plugin: a command with many flags made the old pattern backtrack exponentially (22 flags took over a minute).
 - The tab reloads the iframe if a model write gets no HMR update within 4 s.
 - The gallery's "no matching templates" message sat at the bottom of an empty grid. It now sits under the toolbar, with a clear-search button.
 - A page that does not compile now shows its error in the preview, instead of "No page at …". Page paths may contain Chinese or spaces, and Windows paths work.

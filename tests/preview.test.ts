@@ -787,3 +787,14 @@ describe('rpc review fixes', () => {
     expect(m.takeRuntimeErrors('s')).toHaveLength(20)
   })
 })
+
+describe('installsPackages stays fast', () => {
+  it('a command with thousands of flags is decided in milliseconds (no regex backtracking blow-up)', () => {
+    for (const c of ['yarn ' + '--a '.repeat(5000) + 'x', 'pnpm ' + '--a b '.repeat(5000) + 'list', 'yarn ' + '--a=b '.repeat(2000) + 'x']) {
+      const t = Date.now()
+      expect(installsPackages(c)).toBe(false)
+      expect(Date.now() - t).toBeLessThan(200)
+    }
+    expect(installsPackages('pnpm ' + '--a b '.repeat(50) + 'add dayjs')).toBe(true)
+  })
+})
