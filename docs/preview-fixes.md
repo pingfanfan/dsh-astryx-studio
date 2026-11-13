@@ -53,3 +53,24 @@ Also checked by hand:
 ![A screenshot the model took with astryx_screenshot at 390 px](screenshots/night-02-model-screenshot-390.jpg)
 
 ![astryx_screenshot at 1440 px: charts fully drawn](screenshots/night-03-screenshot-1440.jpg)
+
+## Chinese keywords for `astryx_build` and `astryx_search`
+
+The prompt asks the model for English keywords, but nothing enforced it. Measured with the real CLI 0.7.11:
+
+| Query | Before (sent as is) | After (term-map English) |
+|---|---|---|
+| `astryx_build` 课程 销售 看板 | `shell-top-nav` (fallback) | `dashboard` → `dashboard` (direct) |
+| `astryx_build` 登录页 | `shell-top-nav` (fallback) | `login` → `login` (direct) |
+| `astryx_build` 设置页面 | `shell-top-nav` (fallback) | `settings` → `settings` (direct) |
+| `astryx_build` 商品详情 | `shell-top-nav` (fallback) | `product detail` → `product-detail` (direct) |
+| `astryx_build` 订座 表单 | `shell-top-nav` (fallback) | `form` → `contact-form` (closest) |
+| `astryx_build` 聊天助手 | `shell-top-nav` (fallback) | `chat` → `ai-chat` (direct) |
+| `astryx_search` 表格 / 弹窗 / 日期选择 / 标签页 | 0 results each | Table / Dialog / DateTimeInput / Tab |
+
+Every Chinese build query landed on the same unrelated template. The tools now map known terms and report `translatedFrom`, so the model learns to pass English. 柱状图 (bar chart) still finds no chart component, because Astryx has none; charts come from Recharts.
+
+## Other measurements
+
+- **Cold preview, start to ready page** (headless Chrome loading 3 s after Vite started): 12.0 s without `server.warmup`, 6.0 s with it.
+- **Gallery thumbnails:** 1,070 KB as PNG, 417 KB as WebP (`cwebp -q 82`), and 1,203 KB as JPEG q80. The npm package went from 1.1 MB to 516 KB.
