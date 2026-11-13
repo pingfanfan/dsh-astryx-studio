@@ -55,7 +55,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "check": "pnpm run typecheck && pnpm run build && pnpm run test",
-    "e2e": "ASTRYX_E2E=1 vitest run tests/integration.test.ts --silent=false"
+    "e2e": "ASTRYX_E2E=1 vitest run tests/integration.test.ts --silent=false",
+    "prepublishOnly": "pnpm run check && git diff --exit-code -- lib src/generated"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.1.0",
