@@ -25,7 +25,8 @@ Found by testing 0.1.0 end to end in DSH; details and before/after runs in [docs
 - `astryx_screenshot` fixes from a review:
   - Full-page shots of pages with `height: 100vh` sections are complete. The viewport no longer grows to the page height (which stretched those sections and cut off the rest); the page is captured beyond the viewport instead.
   - A page stuck in an endless loop, or a preview that never answers, can no longer hang the tool: every DevTools call is bounded by the timeout and by cancel. A preview that refuses the connection fails at once instead of after 75 s.
-  - Only the first 5 console errors are kept while the page loads. If Chrome fails to start, its temporary profile is removed only after it has exited.
+  - Only the first 5 console errors are kept while the page loads.
+  - Chrome no longer leaks when it fails to start, its temporary profile is removed only after it has exited, and cleaning it up can no longer crash the Host.
 - RPC and runtime-error fixes: status polls and error reports for unknown sessions no longer create session entries, at most 20 runtime errors reach the model per step, and a stored width such as `constructor` is rejected (`Object.hasOwn` instead of `in`).
 - Preview and gallery tab fixes from a review of the client:
   - The tab polls the Host only while it is visible, one call at a time; so does the watcher that opens the tab.
@@ -40,7 +41,6 @@ Found by testing 0.1.0 end to end in DSH; details and before/after runs in [docs
   - If the preview cannot even be set up (read-only or deleted workspace, full disk), the tab shows the error instead of an unhandled promise rejection that could reach the DSH host.
   - A Vite crash after more than a minute of healthy running gets a fresh automatic restart. Before, any crash after the first restart was final.
   - Approving an install right as the tab shows "needs install" now always starts it.
-- `astryx_screenshot` no longer leaks Chrome when it fails to start, and cleaning up its profile can no longer crash the Host.
 - The write check (`astryx verify`) is more accurate:
   - A file renamed with `apply_patch` is compared with its old contents, not treated as new. Operations that failed partway are still checked, since they may have written; skipped ones are not.
   - Each tool execution keeps its own "before" snapshot, even when two calls share an id. Only the newest 64 are kept, so abandoned ones cannot pile up.
@@ -48,9 +48,7 @@ Found by testing 0.1.0 end to end in DSH; details and before/after runs in [docs
   - A write that fixes a syntax error is not blamed for imports the file already had.
   - When the parent agent and a subagent both write in a workspace, each one sees the next tsc result, instead of whoever asked first taking it. After a new write, the older result is never handed out in place of the run in flight.
   - A tsc run that cannot start (for example, in a read-only workspace) shows as "unverified" instead of an unhandled error. Windows tsc paths are shown relative to the workspace.
-
 - An install or tsc run that times out or is cancelled is killed with SIGKILL if it ignores SIGTERM for 3 s. A run also settles 2 s after its process exits, even if a grandchild still holds its output open, so it can no longer hold the tool call forever. On Windows, `node` is spawned directly, without `cmd.exe` in between. A timeout or cancel on Windows stops the whole process tree (`taskkill /T /F`), so no `pnpm` is left running under a killed `cmd.exe`.
-
 - Windows: `pnpm`/`npm` run through `cmd.exe` with quoted arguments, and Vite and tsc run from their JavaScript entries with `node`, because Node cannot spawn `.cmd` shims directly. Unit-tested only; not yet run on Windows.
 
 ### Performance
@@ -60,10 +58,9 @@ Found by testing 0.1.0 end to end in DSH; details and before/after runs in [docs
 
 ### Security
 
-Found by an independent security review; none critical.
+Found by independent reviews and a dependency audit; none critical.
 
 - **Dependency audit is clean.** The repo's lockfile overrides `zod` (to ≥4.6.6) and `undici` (to ≥8.12.2), which `pnpm audit` flagged. Installs of the plugin were not affected: `zod` reaches users only through `@astryxdesign/cli`'s `^4.4.3`, which already resolves to a fixed version, and `undici` comes only from DSH's own packages, which DSH supplies at runtime.
-
 - **The preview dev server is locked down.** CORS is off, so other localhost pages can no longer read the workspace sources. Only local pages and the DSH desktop app (`dsh-app://app`) may frame the preview (`frame-ancestors`), so its messages can only reach DSH.
 - **Installs into other people's projects need approval.** In a project the plugin did not create, the preview no longer adds packages to its `package.json` on its own. The tab lists the missing packages, and installs them only when the user clicks the button. `astryx_screenshot` tells the model to ask the user. In such a project, `astryx_template` also asks through DSH's approval card, because writing a template may add its packages. Scaffolded projects ship every preview package and never see the prompt.
 - **Creating `./astryx-app` stays inside it.** Inside a parent pnpm workspace, the new app's install used to run the parent's `.pnpmfile.cjs` and root `postinstall` and rewrite the parent's lockfile (reproduced with a probe). It now installs as its own root (`--ignore-workspace --ignore-pnpmfile`). The scaffold also refuses a folder that already has files, instead of overwriting the user's `index.html`, `vite.config.ts` or `src/`, and never writes through a link that already exists.
