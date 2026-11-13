@@ -21,6 +21,7 @@ Found by testing 0.1.0 end to end in DSH; details and before/after runs in [docs
 - The tab reloads the iframe if a model write gets no HMR update within 4 s.
 - The gallery's "no matching templates" message sat at the bottom of an empty grid. It now sits under the toolbar, with a clear-search button.
 - A page that does not compile now shows its error in the preview, instead of "No page at …". Page paths may contain Chinese or spaces, and Windows paths work.
+- A session opened in a subfolder of an Astryx project (`myapp/src`) now uses that project, instead of scaffolding a second one nested inside it. The search stops at the nearest `package.json`, a `.git` folder or the home folder, so an unrelated project further up is never picked.
 - `astryx_screenshot` fixes from a review:
   - Full-page shots of pages with `height: 100vh` sections are complete. The viewport no longer grows to the page height (which stretched those sections and cut off the rest); the page is captured beyond the viewport instead.
   - A page stuck in an endless loop, or a preview that never answers, can no longer hang the tool: every DevTools call is bounded by the timeout and by cancel. A preview that refuses the connection fails at once instead of after 75 s.

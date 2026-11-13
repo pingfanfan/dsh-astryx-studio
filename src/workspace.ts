@@ -6,6 +6,7 @@
  * the official apps/example-vite, pinned to the CLI's own version.
  */
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import catalog from './generated/catalog.json' with { type: 'json' }
 import type { Runner, RunResult } from './proc.js'
@@ -27,11 +28,22 @@ export function isAstryxProject(dir: string): boolean {
   }
 }
 
-/** The Astryx workspace for a session cwd: cwd itself, else `cwd/<appDir>`, else none. */
-export function detectWorkspace(cwd: string, appDir: string): string | undefined {
+/**
+ * The Astryx workspace for a session cwd: cwd itself, else `cwd/<appDir>`, else the enclosing
+ * project when cwd is a folder inside one (`myapp/src`). The walk up stops at the nearest
+ * package.json (used only if it is an Astryx project), a .git folder or the home folder, so an
+ * unrelated project further up is never picked.
+ */
+export function detectWorkspace(cwd: string, appDir: string, home: string = homedir()): string | undefined {
   if (isAstryxProject(cwd)) return cwd
   const app = join(cwd, appDir)
-  return isAstryxProject(app) ? app : undefined
+  if (isAstryxProject(app)) return app
+  if (existsSync(join(cwd, 'package.json')) || existsSync(join(cwd, '.git'))) return undefined
+  for (let dir = dirname(cwd); dir !== dirname(dir) && dir !== home; dir = dirname(dir)) {
+    if (existsSync(join(dir, 'package.json'))) return isAstryxProject(dir) ? dir : undefined
+    if (existsSync(join(dir, '.git'))) return undefined
+  }
+  return undefined
 }
 
 function lexists(path: string): boolean {

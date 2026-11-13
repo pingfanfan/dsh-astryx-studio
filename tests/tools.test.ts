@@ -327,3 +327,18 @@ describe('isInside', () => {
     expect(isInside('/w', '/wx/y')).toBe(false)
   })
 })
+
+describe('detectWorkspace from a subfolder', () => {
+  it('finds the enclosing Astryx project, but stops at the nearest package.json, .git or home', async () => {
+    const { detectWorkspace } = await import('../src/workspace.js')
+    const ws = tempProject({ 'src/pages/main/page.tsx': 'x' }) // an Astryx project
+    mkdirSync(join(ws, 'src/pages/main'), { recursive: true })
+    expect(detectWorkspace(join(ws, 'src/pages'), 'astryx-app', '/nonexistent-home')).toBe(ws)
+    // A non-Astryx package.json in between ends the walk.
+    const outer = tempProject({ 'inner/package.json': '{"name":"other"}', 'inner/src/x.ts': '' })
+    mkdirSync(join(outer, 'inner/src'), { recursive: true })
+    expect(detectWorkspace(join(outer, 'inner/src'), 'astryx-app', '/nonexistent-home')).toBeUndefined()
+    // The home folder is a boundary too.
+    expect(detectWorkspace(join(ws, 'src/pages'), 'astryx-app', join(ws, 'src'))).toBeUndefined()
+  })
+})
