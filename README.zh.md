@@ -105,7 +105,7 @@ dsh --profile dev --no-open
 ## 测试
 
 - **单元测试**（`pnpm test`，约 10 秒）：用假的 CLI 和进程执行器测每个工具和钩子。`tests/shot.test.ts` 会调用本机的 Chrome，没装时自动跳过。
-- **端到端**（`pnpm run e2e`，约 1 分钟，需要联网）：真实的脚手架、模板、安装和 tsc。接着启动真实的预览 Vite，检查 `/@fs` 白名单，并用无头 Chrome 确认生成的 harness 在 390 px 下报告就绪。
+- **端到端**（`pnpm run e2e`，约 1 分钟，需要联网）：真实的脚手架、模板、安装和 tsc，而且是在一个上层 pnpm workspace 里跑的：上层的 `.pnpmfile.cjs` 和 `postinstall` 一旦运行就会留下标记文件，测试要求标记文件不出现、上层也不生成 lockfile。接着启动真实的预览 Vite，检查 `/@fs` 白名单，并用无头 Chrome 确认生成的 harness 在 390 px 下报告就绪。
 - **在 DSH 里手动测**，先 `pnpm run build`：
   1. 用 `dsh --profile dev --no-open` 启动 DSH。`dev` profile 链接的是这个 checkout，DSH 只在启动时加载 `lib/`，所以每次构建后都要重启。
   2. 把一个空文件夹注册成工作区，在里面开会话，用中文让模型做页面。
