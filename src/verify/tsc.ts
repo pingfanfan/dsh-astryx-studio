@@ -35,7 +35,8 @@ export function parseTscOutput(output: string, workspace: string): TscDiagnostic
     }
     const file = m[1]!
     out.push({
-      file: isAbsolute(file) || /^[A-Za-z]:[\\/]/.test(file) ? relative(workspace, file) : file,
+      // Forward slashes on every platform, so the model sees one path style.
+      file: (isAbsolute(file) || /^[A-Za-z]:[\\/]/.test(file) ? relative(workspace, file) : file).replace(/\\/g, '/'),
       line: Number(m[2]),
       column: Number(m[3]),
       code: m[4]!,

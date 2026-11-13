@@ -14,6 +14,7 @@ Found by testing 0.1.0 end to end in DSH; details and before/after runs in [docs
 
 ### Fixed
 
+- The test suite passes on Windows: tests build paths the platform's way. tsc diagnostics show forward-slash paths on every platform, and a write to `src/../x.tsx` no longer counts as a preview change.
 - The preview tab kept showing the template after the model rewrote the page with a different default component. Harness v5 swaps in the HMR-updated page module.
 - Pages created while the preview Vite runs showed "No page at …". Pages now load by absolute `/@fs` URL.
 - The first load could fail with "Failed to fetch dynamically imported module" and send that transient error to the model. Vite now optimizes all dependencies at startup, and fetch failures are retried for about 50 s behind a waiting message before anything is reported.

@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { packageBin } from '../src/platform.js'
 import { describe, expect, it, vi } from 'vitest'
 import { formatRuntimeErrors, installsPackages, PreviewManager } from '../src/preview/manager.js'
 import { LOAD_RETRY_DELAYS, missingPreviewPackages, PREVIEW_DIR, previewFiles, writePreviewHarness } from '../src/preview/scaffold.js'
@@ -48,9 +49,7 @@ describe('preview harness scaffold', () => {
     expect(cfg).toContain("host: '127.0.0.1'")
     expect(cfg).toContain('strict: true')
     const allow = cfg.slice(cfg.indexOf('allow: ['), cfg.indexOf(']', cfg.indexOf('allow: [')))
-    expect(allow).toContain('"/w/.astryx-studio"')
-    expect(allow).toContain('"/w/src"')
-    expect(allow).toContain('"/w/node_modules"')
+    for (const dir of ['.astryx-studio', 'src', 'node_modules']) expect(allow).toContain(JSON.stringify(join(ws, dir)))
     expect(allow).not.toMatch(/"\/w"\s*,/)
     expect(cfg).toContain('astryxStylex({rootDir: workspace})')
     // Every dependency optimized at startup: no mid-load "optimized dependencies changed. reloading".
@@ -145,7 +144,8 @@ describe('preview server lifecycle', () => {
     const p = server.ensure()
     const again = server.ensure() // concurrent callers share one start
     await vi.waitFor(() => expect(procs).toHaveLength(1))
-    expect(procs[0]!.argv).toEqual(['/w/node_modules/.bin/vite', '--config', '.astryx-studio/vite.config.ts', '--host', '127.0.0.1', '--port', '40001', '--strictPort'])
+    // packageBin is `node …/vite.js` on Windows, the .bin shim elsewhere.
+    expect(procs[0]!.argv).toEqual([...packageBin('/w', 'vite'), '--config', join('.astryx-studio', 'vite.config.ts'), '--host', '127.0.0.1', '--port', '40001', '--strictPort'])
     expect(procs[0]!.cwd).toBe('/w')
     procs[0]!.emit(READY(40001))
     expect((await p).state).toBe('running')

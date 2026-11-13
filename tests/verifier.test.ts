@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { createTscScheduler, parseTscOutput } from '../src/verify/tsc.js'
 import { pathsFromArgs, pathsFromValue, Verifier, writesFromValue } from '../src/verify/verifier.js'
@@ -21,10 +21,10 @@ describe('argument and result paths', () => {
     expect(pathsFromArgs('str_replace_editor', { path: 'b.tsx' })).toEqual(['b.tsx'])
     const patch = '*** Begin Patch\n*** Update File: src/a.tsx\n@@\n-x\n+y\n*** Add File: src/b.ts\n+z\n*** End Patch'
     expect(pathsFromArgs('apply_patch', { input: patch })).toEqual(['src/a.tsx', 'src/b.ts'])
-    expect(pathsFromValue('write', { path: '/w/a.tsx' }, '/w')).toEqual(['/w/a.tsx'])
+    expect(pathsFromValue('write', { path: '/w/a.tsx' }, '/w')).toEqual([resolve('/w/a.tsx')])
     expect(
       pathsFromValue('apply_patch', { operations: [{ kind: 'update', path: 'a.tsx' }, { kind: 'delete', path: 'b.tsx' }, { kind: 'move', path: 'c.tsx', destination: 'd.tsx' }] }, '/w'),
-    ).toEqual(['/w/a.tsx', '/w/d.tsx'])
+    ).toEqual([resolve('/w', 'a.tsx'), resolve('/w', 'd.tsx')])
   })
 })
 
@@ -140,10 +140,14 @@ describe('tsc scheduler', () => {
     ])
   })
 
+  it('reports diagnostic paths with forward slashes on every platform', () => {
+    expect(parseTscOutput(`src\\pages\\a.tsx(1,2): error TS1005: ';' expected.`, '/w')[0]!.file).toBe('src/pages/a.tsx')
+  })
+
   it('uses the workspace tsc with an incremental build info under .astryx-studio', async () => {
     const { ws, calls, tsc } = setup()
     void tsc.schedule(ws)
-    expect(calls[0]!.args.join(' ')).toContain('--incremental --tsBuildInfoFile .astryx-studio/tsbuildinfo')
+    expect(calls[0]!.args.join(' ')).toContain(`--incremental --tsBuildInfoFile ${join('.astryx-studio', 'tsbuildinfo')}`)
     expect(readFileSync(join(ws, 'package.json'), 'utf8')).toContain('@astryxdesign/core')
     tsc.dispose()
   })
@@ -167,8 +171,8 @@ describe('review fixes', () => {
       { kind: 'add', path: 'd.tsx', status: 'completed' },
     ]
     expect(writesFromValue('apply_patch', { operations: ops }, '/w')).toEqual([
-      { file: '/w/c.tsx', from: '/w/b.tsx' },
-      { file: '/w/d.tsx', from: '/w/d.tsx' },
+      { file: resolve('/w', 'c.tsx'), from: resolve('/w', 'b.tsx') },
+      { file: resolve('/w', 'd.tsx'), from: resolve('/w', 'd.tsx') },
     ])
   })
 

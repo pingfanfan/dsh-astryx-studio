@@ -226,5 +226,6 @@ describe('affectsPreview', () => {
     expect(affectsPreview('/w', '/w/package.json')).toBe(false)
     expect(affectsPreview('/w', '/w/src/notes.md')).toBe(false)
     expect(affectsPreview('/w', '/w/srcx/a.tsx')).toBe(false)
+    expect(affectsPreview('/w', '/w/src/../a.tsx')).toBe(false)
   })
 })

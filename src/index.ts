@@ -14,7 +14,7 @@ import type {} from '@deepseek-ai/dsh-working-directory'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import type { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import type { ToolExecution, ToolRunContext } from '@deepseek-ai/dsh-tools'
-import { join, relative, resolve, sep } from 'node:path'
+import { isAbsolute, join, relative, resolve } from 'node:path'
 import { loadAstryxApi } from './astryx.js'
 import { DEFAULT_PAGE, formatRuntimeErrors, installsPackages, PreviewManager, untrustedText } from './preview/manager.js'
 import { missingPreviewPackages, PREVIEW_DIR } from './preview/scaffold.js'
@@ -52,8 +52,9 @@ export function verifyMessage(body: string): UserMessage {
 
 /** Whether a written file can change the preview: code or styles under the workspace's src/. */
 export function affectsPreview(workspace: string, file: string): boolean {
-  const src = join(workspace, 'src') + sep
-  return file.startsWith(src) && /\.(?:[cm]?[jt]sx?|css|json)$/.test(file)
+  // relative() normalises separators (and drive-letter case on Windows) before comparing.
+  const rel = relative(workspace, file)
+  return !isAbsolute(rel) && rel.split(/[\\/]/)[0] === 'src' && /\.(?:[cm]?[jt]sx?|css|json)$/.test(rel)
 }
 
 /** Test seam: replace process spawning and the CLI. */

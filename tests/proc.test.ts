@@ -48,8 +48,11 @@ describe('runProcess (real child processes)', () => {
     expect(r.ms).toBeLessThan(8000)
   }, 10_000)
 
-  it('rejects when the command cannot be spawned', async () => {
-    await expect(runProcess('astryx-no-such-command-xyz', [], { cwd })).rejects.toThrow(/ENOENT/)
+  it('fails when the command does not exist', async () => {
+    const run = runProcess('astryx-no-such-command-xyz', [], { cwd })
+    // Windows goes through cmd.exe, which starts fine and exits non-zero; elsewhere spawn fails.
+    if (process.platform === 'win32') expect((await run).code).not.toBe(0)
+    else await expect(run).rejects.toThrow(/ENOENT/)
   })
 
   it('runs CI-style (CI=1, no colour)', async () => {
