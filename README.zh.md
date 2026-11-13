@@ -23,8 +23,8 @@
 
 **验证钩子。** 对 Astryx 工作区里 `.ts/.tsx` 的 `write` / `edit` / `apply_patch` / `str_replace_editor` 写入：
 
-- **同步**（毫秒级，随工具结果返回 `astryx verify ✗`）：esbuild 语法检查，加 lint 计数差：一次写入不能让 `<div>`、`style={{}}`、`stylex.create` 的数量增加，也不能新增白名单（`@astryxdesign/*`、`@stylexjs/stylex`、`react`、`react-dom`、`@heroicons/react`、`lucide-react`、`recharts`）以外的 import。已在 `@astryxdesign/cli` 0.7.11 的全部 57 个页面模板上校准到零误报，见 [docs/lint-calibration.md](docs/lint-calibration.md)。
-- **异步**：`tsc --noEmit --incremental`，同一工作区同一时刻只跑一个，新的写入会取消正在跑的那次；最新结果在 agent 下一步开头注入（`astryx verify ✓ (tsc 0.6s)` 或 TS 报错）；如果 tsc 还在跑，下一步最多等 `tscStepWaitMs`（5 秒），这样模型改完就收尾时也能收到结论。端到端证据见 [docs/e2e-day1.md](docs/e2e-day1.md)。
+- **同步**（毫秒级，随工具结果返回 `astryx verify ✗`）：esbuild 语法检查，加 lint 计数差：一次写入不能让 `<div>`、`style={{}}`、`stylex.create` 的数量增加，也不能新增白名单（`@astryxdesign/*`、`@stylexjs/stylex`、`react`、`react-dom`、`@heroicons/react`、`lucide-react`、`recharts`）以外的 import。计数只看代码，注释不算；用 `apply_patch` 改名的文件和改名前的内容比较。已在 `@astryxdesign/cli` 0.7.11 的全部 57 个页面模板上校准到零误报，见 [docs/lint-calibration.md](docs/lint-calibration.md)。
+- **异步**：`tsc --noEmit --incremental`，同一工作区同一时刻只跑一个，新的写入会取消正在跑的那次；最新结果在每个写过这个工作区的 agent（包括子 agent）的下一步开头注入（`astryx verify ✓ (tsc 0.6s)` 或 TS 报错）；如果 tsc 还在跑，下一步最多等 `tscStepWaitMs`（5 秒），这样模型改完就收尾时也能收到结论。端到端证据见 [docs/e2e-day1.md](docs/e2e-day1.md)。
 
 **Prompt 和 skill。** 一个内容固定的 prompt section（`build()` 的 playbook 规则加中文工作流），以及 `astryx-page` skill（模板选型表和全部模板清单）。
 
