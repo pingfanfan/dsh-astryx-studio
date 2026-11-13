@@ -29,6 +29,17 @@ interface SessionState {
 }
 
 const NONE: VerifyStatus = { state: 'none', summary: '', at: 0 }
+
+/**
+ * Whether a shell command adds, removes or reinstalls packages (pnpm / npm / yarn / bun),
+ * e.g. `cd astryx-app && pnpm add dayjs`. Read-only commands (`pnpm list`, `npm view`,
+ * `npm run build`, `pnpm exec tsc`) do not count.
+ */
+export function installsPackages(command: string): boolean {
+  // Quoted text is data (echo "… pnpm add …", commit messages), not a command.
+  const bare = command.replace(/(["'])(?:\\.|(?!\1)[^\\])*\1/g, '""')
+  return /(?:^|[\s;&|(])(?:pnpm|npm|yarn|bun)\s+(?:--?[\w-]+(?:[= ]\S+)?\s+)*(?:add|install|i|ci|remove|rm|uninstall|un|update|up|upgrade)(?=\s|$|;|&|\|)/.test(bare)
+}
 export const DEFAULT_PAGE = 'src/pages/main/page.tsx'
 
 export interface PreviewManagerOptions {
@@ -82,9 +93,24 @@ export class PreviewManager {
       s.openSeq++
       this.modelWrote(sessionId, workspace)
     }
-    const server = this.servers.get(workspace)
-    if (installedPackages && server?.status().state === 'running') server.stop()
+    if (installedPackages) this.stopForInstall(workspace)
     void this.ensure(workspace)
+  }
+
+  /**
+   * Packages were added or removed in `workspace` by a shell command. A running preview Vite
+   * keeps failed resolutions cached until it restarts, so restart it; start nothing otherwise.
+   */
+  packagesInstalled(workspace: string): void {
+    if (this.stopForInstall(workspace)) void this.ensure(workspace)
+  }
+
+  /** Stop the workspace's preview Vite if it is running; true when it was. */
+  private stopForInstall(workspace: string): boolean {
+    const server = this.servers.get(workspace)
+    if (server?.status().state !== 'running') return false
+    server.stop()
+    return true
   }
 
   /** The model wrote a file in `workspace` (any file tool or a template). */

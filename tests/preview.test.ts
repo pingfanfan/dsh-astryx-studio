@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
-import { formatRuntimeErrors, PreviewManager } from '../src/preview/manager.js'
+import { formatRuntimeErrors, installsPackages, PreviewManager } from '../src/preview/manager.js'
 import { LOAD_RETRY_DELAYS, missingPreviewPackages, PREVIEW_DIR, previewFiles, writePreviewHarness } from '../src/preview/scaffold.js'
 import { parseVitePort, PreviewServer, type SpawnedProcess, type Spawner } from '../src/preview/server.js'
 import { createRpcHandler, fetchRoutes } from '../src/rpc.js'
@@ -241,6 +241,62 @@ describe('preview manager', () => {
     m.modelWrote('s', '/w')
     expect(m.reportRuntimeError('s', e)).toBe(true) // a new write re-arms the same error
     expect(formatRuntimeErrors(m.takeRuntimeErrors('s'))).toContain('预览运行时错误')
+  })
+
+  it('packagesInstalled (shell install) restarts a running Vite and starts nothing when none runs', async () => {
+    const ws = tempProject()
+    const { m, runner, procs } = manager()
+    m.packagesInstalled(ws) // no preview yet: nothing starts
+    await tick()
+    expect(procs).toHaveLength(0)
+    expect(runner.calls).toHaveLength(0)
+
+    m.templateWritten('s1', ws, 'src/pages/main/page.tsx', true) // first template + install: just start
+    await vi.waitFor(() => expect(runner.calls).toHaveLength(1))
+    runner.calls[0]!.resolve(ok())
+    await vi.waitFor(() => expect(procs).toHaveLength(1))
+    procs[0]!.emit(READY(40200))
+    await vi.waitFor(() => expect(m.status('s1').preview.state).toBe('running'))
+
+    m.packagesInstalled(ws)
+    expect(procs[0]!.terminated).toBe(true)
+    await vi.waitFor(() => expect(runner.calls).toHaveLength(2))
+    runner.calls[1]!.resolve(ok())
+    await vi.waitFor(() => expect(procs).toHaveLength(2))
+    procs[1]!.emit(READY(40201))
+    await vi.waitFor(() => expect(m.status('s1').preview.url).toBe('http://127.0.0.1:40201/'))
+    m.stopAll()
+  })
+
+  it('installsPackages recognises install / remove commands only', () => {
+    for (const c of [
+      'pnpm add dayjs',
+      'cd astryx-app && pnpm add -D @types/node',
+      'npm install',
+      'npm i lodash',
+      'npm ci',
+      'yarn add zod',
+      'bun add zod',
+      'pnpm remove dayjs',
+      'npm uninstall left-pad',
+      'pnpm --dir astryx-app add dayjs',
+      'pnpm -C astryx-app install',
+      'pnpm up recharts',
+      '(cd astryx-app; pnpm add dayjs)',
+    ])
+      expect(installsPackages(c), c).toBe(true)
+    for (const c of [
+      'pnpm list',
+      'npm view recharts version',
+      'npm run build',
+      'pnpm exec tsc --noEmit',
+      'pnpm build',
+      'cat package.json | grep install',
+      'echo "run pnpm add later"',
+      'npx vite --version',
+      'ls node_modules/.pnpm | grep addon',
+    ])
+      expect(installsPackages(c), c).toBe(false)
   })
 
   it('restarts a running Vite when a template write installed packages (Vite caches failed resolutions)', async () => {

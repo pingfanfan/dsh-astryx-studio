@@ -152,6 +152,8 @@ interface ScreenshotValue {
 export declare const name = "dsh-astryx-studio";
 export declare const inject: string[];
 export declare const MESSAGE_SOURCE = "astryx-studio";
+/** DSH's shell tool (`bash -c`); its `command` argument is checked for package installs. */
+export declare const SHELL_TOOL = "bash";
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {
     /** Verify findings injected by the astryx-studio plugin. */

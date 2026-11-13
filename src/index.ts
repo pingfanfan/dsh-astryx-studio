@@ -16,7 +16,7 @@ import type { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import type { ToolExecution, ToolRunContext } from '@deepseek-ai/dsh-tools'
 import { join, relative } from 'node:path'
 import { loadAstryxApi } from './astryx.js'
-import { DEFAULT_PAGE, formatRuntimeErrors, PreviewManager } from './preview/manager.js'
+import { DEFAULT_PAGE, formatRuntimeErrors, installsPackages, PreviewManager } from './preview/manager.js'
 import { PREVIEW_DIR } from './preview/scaffold.js'
 import { captureScreenshot, findChrome } from './preview/shot.js'
 import { previewQuery, type ThemeName } from './shared/preview-protocol.js'
@@ -36,6 +36,8 @@ export const name = 'dsh-astryx-studio'
 export const inject = ['tools', 'systemPrompt', 'skills', 'workingDirectory']
 
 export const MESSAGE_SOURCE = 'astryx-studio'
+/** DSH's shell tool (`bash -c`); its `command` argument is checked for package installs. */
+export const SHELL_TOOL = 'bash'
 
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {
@@ -243,6 +245,16 @@ export function apply(ctx: Context, config: Partial<Config> = {}, overrides: Ove
 
   // Post-execute: synchronous syntax + lint on written Astryx files; start tsc.
   ctx.on('tools/post-execute', async (exec, result, next) => {
+    // A package install from the shell: restart the running preview Vite (it caches failed resolutions).
+    if (exec.name === SHELL_TOOL && !result.isError) {
+      const command = (exec.arguments as { command?: unknown } | undefined)?.command
+      if (typeof command === 'string' && installsPackages(command)) {
+        const cwd = await cwdOf(exec)
+        const workspace = cwd ? detectWorkspace(cwd, cfg.appDir) : undefined
+        if (workspace) manager.packagesInstalled(workspace)
+      }
+      return next()
+    }
     if (!isFileTool(exec.name)) return next()
     if (result.isError) {
       verifier.forget(exec.callId)

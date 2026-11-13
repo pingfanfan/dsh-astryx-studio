@@ -107,6 +107,21 @@ describe('tools/pre-execute', () => {
   })
 })
 
+describe('tools/post-execute on the shell tool', () => {
+  it('a bash package install passes through unchanged (and only restarts a preview that runs)', async () => {
+    const ws = tempProject({ 'src/pages/main/page.tsx': PAGE })
+    const f = boot(ws)
+    const signal = new AbortController().signal
+    const post = f.handlers.get('tools/post-execute')!
+    for (const command of ['pnpm add dayjs', 'ls -la']) {
+      const exec = { name: 'bash', callId: 'b-' + command, arguments: { command }, agent, signal }
+      const d = await post(exec, { isError: false, value: { stdout: '' }, content: [] }, async () => ({ kind: 'accept' }))
+      expect(d).toEqual({ kind: 'accept' })
+    }
+    expect(f.runner.calls).toHaveLength(0) // no preview ran, so nothing was installed or started
+  })
+})
+
 describe('tools/post-execute + agent/pre-step', () => {
   it('a bad edit gets astryx verify ✗ as an additional context; tsc ✓ arrives at the next step', async () => {
     const ws = tempProject({ 'src/pages/main/page.tsx': PAGE })
