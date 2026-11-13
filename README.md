@@ -1,5 +1,7 @@
 # dsh-astryx-studio
 
+[![CI](https://github.com/pingfanfan/dsh-astryx-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/pingfanfan/dsh-astryx-studio/actions/workflows/ci.yml)
+
 English | [中文](README.zh.md)
 
 A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`) plugin that lets the agent build pages with Meta's [Astryx](https://github.com/meta/astryx) design system: structured Astryx tools, a verify hook on every write, and a live preview tab in the right Sidebar.

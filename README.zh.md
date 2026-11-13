@@ -1,5 +1,7 @@
 # dsh-astryx-studio
 
+[![CI](https://github.com/pingfanfan/dsh-astryx-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/pingfanfan/dsh-astryx-studio/actions/workflows/ci.yml)
+
 [English](README.md) | 中文
 
 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（`dsh`）插件，让 agent 用 Meta 的 [Astryx](https://github.com/meta/astryx) 设计系统构建页面。它提供结构化的 Astryx 工具、每次写入后跑的验证钩子，以及右侧 Sidebar 里的实时预览 tab。
