@@ -46,7 +46,8 @@ function lexists(path: string): boolean {
 /** Whether `file` lies inside `dir` (both absolute). */
 export function isInside(dir: string, file: string): boolean {
   const rel = relative(dir, file)
-  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel) && !rel.startsWith(`..${sep}`))
+  // `..` as a whole first segment means outside; a folder named `..assets` is inside.
+  return rel === '' || (rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel))
 }
 
 /**

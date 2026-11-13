@@ -307,3 +307,15 @@ describe('third review fixes (tools)', () => {
     expect(englishKeywords('表格tree')).toBe('table tree')
   })
 })
+
+describe('isInside', () => {
+  it('treats ".." only as a whole segment', async () => {
+    const { isInside } = await import('../src/workspace.js')
+    expect(isInside('/w', '/w')).toBe(true)
+    expect(isInside('/w', '/w/..assets/x.html')).toBe(true)
+    expect(isInside('/w', '/w/a/../b')).toBe(true)
+    expect(isInside('/w', '/')).toBe(false)
+    expect(isInside('/w', '/w/../x')).toBe(false)
+    expect(isInside('/w', '/wx/y')).toBe(false)
+  })
+})
