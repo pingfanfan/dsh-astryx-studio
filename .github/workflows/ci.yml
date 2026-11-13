@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: check (${{ matrix.os }}, node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    # Windows is informational until the suite is checked there (some tests use a POSIX shell).
+    continue-on-error: ${{ matrix.os == 'windows-latest' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [22]
+        include:
+          - os: ubuntu-latest
+            node: 24
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.17.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck
+      - run: pnpm run build
+      # lib/ is committed (local-checkout and git installs need no build): it must match the sources.
+      - name: lib/ is up to date
+        shell: bash
+        run: |
+          if ! git diff --exit-code -- lib src/generated; then
+            echo "::error::lib/ or src/generated is stale; run pnpm run build and commit"
+            exit 1
+          fi
+      # tests/shot.test.ts drives the runner's preinstalled Chrome (skipped where none is found).
+      - run: pnpm test

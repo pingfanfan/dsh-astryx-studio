@@ -51,7 +51,8 @@ describe.skipIf(!chrome)('captureScreenshot (real headless Chrome)', () => {
   }, 60_000)
 })
 
-describe('captureScreenshot cleanup', () => {
+// The fake browser is a POSIX shell script.
+describe.skipIf(process.platform === 'win32')('captureScreenshot cleanup', () => {
   it('kills a browser that never reports DevTools, instead of leaking it', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'fake-chrome-'))
     const pidFile = join(dir, 'pid')
