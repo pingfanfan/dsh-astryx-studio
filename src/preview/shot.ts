@@ -113,8 +113,9 @@ class Cdp {
 const sleep = (ms: number, signal?: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
     if (signal?.aborted) return reject(new Error('aborted'))
-    const t = setTimeout(resolve, ms)
-    signal?.addEventListener('abort', () => (clearTimeout(t), reject(new Error('aborted'))), { once: true })
+    const onAbort = () => (clearTimeout(t), reject(new Error('aborted')))
+    const t = setTimeout(() => (signal?.removeEventListener('abort', onAbort), resolve()), ms)
+    signal?.addEventListener('abort', onAbort, { once: true })
   })
 
 function launch(chrome: string, profile: string, timeoutMs: number): Promise<{ proc: ChildProcess; ws: string }> {
@@ -137,18 +138,45 @@ function launch(chrome: string, profile: string, timeoutMs: number): Promise<{ p
   )
   return new Promise((resolve, reject) => {
     let err = ''
-    const timer = setTimeout(() => reject(new Error(`Chrome did not start within ${timeoutMs} ms: ${err.slice(-300)}`)), timeoutMs)
-    proc.stderr!.on('data', (d: Buffer) => {
-      err += d.toString()
+    let settled = false
+    // On any failure the process is killed here: the caller never got a handle to it.
+    const fail = (e: Error) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      proc.stderr!.off('data', onData)
+      if (proc.exitCode === null) proc.kill('SIGKILL')
+      reject(e)
+    }
+    const onData = (d: Buffer) => {
+      err = (err + d.toString()).slice(-4000)
       const m = /DevTools listening on (ws:\/\/\S+)/.exec(err)
-      if (m) {
+      if (m && !settled) {
+        settled = true
         clearTimeout(timer)
+        proc.stderr!.off('data', onData)
+        proc.stderr!.resume() // keep draining so Chrome never blocks on a full pipe
         resolve({ proc, ws: m[1]! })
       }
-    })
-    proc.on('error', (e) => (clearTimeout(timer), reject(e)))
-    proc.on('exit', (code) => (clearTimeout(timer), reject(new Error(`Chrome exited (${code}) before DevTools was ready: ${err.slice(-300)}`))))
+    }
+    const timer = setTimeout(() => fail(new Error(`Chrome did not start within ${timeoutMs} ms: ${err.slice(-300)}`)), timeoutMs)
+    proc.stderr!.on('data', onData)
+    proc.on('error', (e) => fail(e))
+    proc.on('exit', (code) => fail(new Error(`Chrome exited (${code}) before DevTools was ready: ${err.slice(-300)}`)))
   })
+}
+
+/** Remove the temporary Chrome profile once Chrome has exited; never throws (e.g. EBUSY on Windows). */
+function removeProfile(profile: string, proc: ChildProcess | undefined) {
+  const remove = () => {
+    try {
+      rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
+    } catch {
+      // Leaves a temp dir behind; the OS cleans its temp folder.
+    }
+  }
+  if (!proc || proc.exitCode !== null || proc.signalCode !== null) return remove()
+  proc.once('exit', () => setTimeout(remove, 200).unref())
 }
 
 function describe(value: unknown): string {
@@ -160,7 +188,8 @@ function describe(value: unknown): string {
 
 /** Load `url` at `width` in headless Chrome and write a PNG to `out`. */
 export async function captureScreenshot(o: ShotOptions): Promise<ShotResult> {
-  const timeoutMs = o.timeoutMs ?? 45_000
+  // Longer than the harness's load-retry budget (~49 s), so a slow install still ends "ready".
+  const timeoutMs = o.timeoutMs ?? 75_000
   const deadline = Date.now() + timeoutMs
   const viewportHeight = o.height ?? 900
   const maxHeight = o.maxHeight ?? 8000
@@ -193,11 +222,17 @@ export async function captureScreenshot(o: ShotOptions): Promise<ShotResult> {
     await send('Page.enable')
     await send('Page.navigate', { url: o.url })
 
-    // Wait for the harness to report ready / error (it may be retrying a load meanwhile).
+    // Wait for the harness to report ready / error (it may be retrying a load meanwhile, and its
+    // reloads destroy the execution context under an in-flight evaluate: keep polling then).
     let pageState: ShotResult['pageState'] = 'timeout'
     while (Date.now() < deadline - 3000) {
-      const r = (await send('Runtime.evaluate', { expression: 'document.documentElement.dataset.astryxStudio || ""', returnByValue: true })) as { result?: { value?: string } }
-      const v = r.result?.value
+      let v: string | undefined
+      try {
+        const r = (await send('Runtime.evaluate', { expression: 'document.documentElement.dataset.astryxStudio || ""', returnByValue: true })) as { result?: { value?: string } }
+        v = r.result?.value
+      } catch {
+        v = undefined
+      }
       if (v === 'ready' || v === 'error') {
         pageState = v
         break
@@ -232,7 +267,6 @@ export async function captureScreenshot(o: ShotOptions): Promise<ShotResult> {
       const p = proc
       setTimeout(() => p.exitCode === null && p.kill('SIGKILL'), 2000).unref()
     }
-    // Chrome may still hold the profile for a moment; a failed cleanup only leaves a temp dir.
-    setTimeout(() => rmSync(profile, { recursive: true, force: true }), 3000).unref()
+    removeProfile(profile, proc)
   }
 }

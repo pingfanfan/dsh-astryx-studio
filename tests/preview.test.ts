@@ -402,3 +402,65 @@ describe('rpc over /api fetch routes', () => {
     expect(notJson.status).toBe(400)
   })
 })
+
+describe('review fixes', () => {
+  function manager(now = { t: 1000 }) {
+    const runner = fakeRunner()
+    const procs: { emit: (s: string) => void; terminated: boolean }[] = []
+    const spawn: Spawner = () => {
+      const listeners: ((s: string) => void)[] = []
+      let exit!: (o: { exitCode: number | null; signal: string | null }) => void
+      const done = new Promise<{ exitCode: number | null; signal: string | null }>((r) => (exit = r))
+      const entry = { emit: (s: string) => listeners.forEach((l) => l(s)), terminated: false }
+      procs.push(entry)
+      return { onOutput: (l) => listeners.push(l), done, terminate: () => ((entry.terminated = true), exit({ exitCode: null, signal: 'SIGTERM' })) }
+    }
+    const m = new PreviewManager({ run: runner.run, installTimeoutMs: 1000, now: () => now.t })
+    m.setSpawner(spawn)
+    return { m, runner, procs, now }
+  }
+
+  it('a write the preview cannot show re-arms runtime errors but does not move the watchdog time', () => {
+    const { m, now } = manager()
+    now.t = 2000
+    m.modelWrote('s', '/w', true)
+    expect(m.status('s').lastWriteAt).toBe(2000)
+    now.t = 3000
+    m.modelWrote('s', '/w', false) // e.g. README.md
+    expect(m.status('s').lastWriteAt).toBe(2000)
+    expect(m.reportRuntimeError('s', { kind: 'render', message: 'x' }, 2500)).toBe(false) // gated by the README write
+  })
+
+  it('an install while Vite is still starting restarts it once it is up', async () => {
+    const ws = tempProject()
+    const { m, runner, procs } = manager()
+    m.templateWritten('s1', ws, 'src/pages/main/page.tsx')
+    await vi.waitFor(() => expect(runner.calls).toHaveLength(1))
+    runner.calls[0]!.resolve(ok())
+    await vi.waitFor(() => expect(procs).toHaveLength(1))
+    expect(m.status('s1').preview.state).toBe('starting')
+    expect(m.packagesInstalled(ws)).toBe(true)
+    procs[0]!.emit(READY(40300))
+    await vi.waitFor(() => expect(procs[0]!.terminated).toBe(true))
+    await vi.waitFor(() => expect(runner.calls).toHaveLength(2))
+    runner.calls[1]!.resolve(ok())
+    await vi.waitFor(() => expect(procs).toHaveLength(2))
+    procs[1]!.emit(READY(40301))
+    await vi.waitFor(() => expect(m.status('s1').preview.url).toBe('http://127.0.0.1:40301/'))
+    m.stopAll()
+  })
+
+  it('harness: any file name under the workspace is a page; a page that does not compile shows its error', () => {
+    const main = previewFiles('/w')[`${PREVIEW_DIR}/main.tsx`]!
+    const check = /if \((.+)\) return 'missing';\n  \/\/ Vite answers 404/.exec(main) ?? /  if (\(!\/.+) return 'missing';/.exec(main)
+    expect(check).not.toBeNull()
+    expect(main).toContain("page.includes('\\\\')")
+    expect(main).toContain('if (probe.status >= 500) throw new CompileError(await compileMessage(probe));')
+    expect(main).toContain('/const error = (\\{.*?\\});?\\s*\\n/s')
+    expect(main).toContain("reportError(error instanceof CompileError ? 'vite' : 'render', error);")
+    // The generated page check accepts Chinese and spaces and refuses escapes.
+    const guard = new Function('page', `return !/\\.tsx?$/.test(page) || page.startsWith('/') || page.includes('\\\\') || page.split('/').includes('..')`) as (p: string) => boolean
+    for (const ok of ['src/pages/首页/page.tsx', 'src/pages/my page/page.tsx', 'src/a.ts']) expect(guard(ok), ok).toBe(false)
+    for (const bad of ['../x.tsx', 'src/../../x.tsx', '/etc/x.tsx', 'src\\x.tsx', 'src/x.css']) expect(guard(bad), bad).toBe(true)
+  })
+})

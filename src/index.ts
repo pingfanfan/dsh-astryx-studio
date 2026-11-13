@@ -14,7 +14,7 @@ import type {} from '@deepseek-ai/dsh-working-directory'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import type { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import type { ToolExecution, ToolRunContext } from '@deepseek-ai/dsh-tools'
-import { join, relative } from 'node:path'
+import { join, relative, resolve, sep } from 'node:path'
 import { loadAstryxApi } from './astryx.js'
 import { DEFAULT_PAGE, formatRuntimeErrors, installsPackages, PreviewManager } from './preview/manager.js'
 import { PREVIEW_DIR } from './preview/scaffold.js'
@@ -29,7 +29,7 @@ import { PROMPT_SECTION_NAME, PROMPT_TEXT, SKILL_REGISTRATION } from './prompt.j
 import { createTools, TOOL_NAMES, type ScreenshotArgs, type ScreenshotValue, type ToolEnv } from './tools.js'
 import { createTscScheduler } from './verify/tsc.js'
 import { isFileTool, Verifier } from './verify/verifier.js'
-import { detectWorkspace, resolveInside } from './workspace.js'
+import { detectWorkspace, resolveInside, toPosix } from './workspace.js'
 
 export { Config }
 export const name = 'dsh-astryx-studio'
@@ -48,6 +48,12 @@ declare module '@deepseek-ai/dsh-llm' {
 
 export function verifyMessage(body: string): UserMessage {
   return createUserMessage({ content: [{ type: 'text', text: body }], source: { kind: MESSAGE_SOURCE } })
+}
+
+/** Whether a written file can change the preview: code or styles under the workspace's src/. */
+export function affectsPreview(workspace: string, file: string): boolean {
+  const src = join(workspace, 'src') + sep
+  return file.startsWith(src) && /\.(?:[cm]?[jt]sx?|css|json)$/.test(file)
 }
 
 /** Test seam: replace process spawning and the CLI. */
@@ -183,7 +189,7 @@ export function apply(ctx: Context, config: Partial<Config> = {}, overrides: Ove
     const cwd = await cwdOf(exec)
     const workspace = known?.workspace ?? (cwd ? detectWorkspace(cwd, cfg.appDir) : undefined)
     if (!workspace) throw new Error('no Astryx workspace here; create a page with astryx_template first')
-    const page = a.page ? relative(workspace, resolveInside(workspace, a.page)) : (known?.page ?? DEFAULT_PAGE)
+    const page = a.page ? toPosix(relative(workspace, resolveInside(workspace, a.page))) : (known?.page ?? DEFAULT_PAGE)
     const chrome = findChrome(cfg.chromePath)
     if (!chrome) {
       throw new Error(
@@ -270,7 +276,12 @@ export function apply(ctx: Context, config: Partial<Config> = {}, overrides: Ove
       workspace,
       agentId: exec.agent?.id,
     })
-    if (workspace) manager.modelWrote(exec.agent?.id, workspace)
+    if (workspace) {
+      const written = (result.value as { path?: unknown } | undefined)?.path
+      // Unknown result shape (e.g. a multi-file patch): assume the preview may change.
+      const affects = typeof written === 'string' ? affectsPreview(workspace, resolve(cwd ?? workspace, written)) : true
+      manager.modelWrote(exec.agent?.id, workspace, affects)
+    }
     const decision = await next()
     if (reports.length === 0 || decision.kind !== 'accept') return decision
     return {

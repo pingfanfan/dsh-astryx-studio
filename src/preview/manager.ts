@@ -23,6 +23,8 @@ interface SessionState {
   openSeq: number
   /** Time of the model's last write in this session; errors before it are stale. */
   lastWriteAt?: number
+  /** Time of the last write that can change the preview (code or styles under src/): the tab's HMR watchdog. */
+  previewWriteAt?: number
   /** Errors already queued since the last write (dedupe key). */
   seen: Set<string>
   pending: RuntimeErrorReport[]
@@ -93,16 +95,25 @@ export class PreviewManager {
       s.openSeq++
       this.modelWrote(sessionId, workspace)
     }
-    if (installedPackages) this.stopForInstall(workspace)
-    void this.ensure(workspace)
+    // One start path only: a restart after an install, else a plain ensure.
+    if (!(installedPackages && this.packagesInstalled(workspace))) void this.ensure(workspace)
   }
 
   /**
-   * Packages were added or removed in `workspace` by a shell command. A running preview Vite
-   * keeps failed resolutions cached until it restarts, so restart it; start nothing otherwise.
+   * Packages were added or removed in `workspace` (astryx_template or a shell command). A running
+   * preview Vite keeps failed resolutions cached until it restarts, so restart it; one still
+   * starting is restarted once it is up; start nothing when none runs.
+   * @returns true when it restarted (or will restart) the server.
    */
-  packagesInstalled(workspace: string): void {
-    if (this.stopForInstall(workspace)) void this.ensure(workspace)
+  packagesInstalled(workspace: string): boolean {
+    const server = this.servers.get(workspace)
+    if (server?.status().state === 'starting') {
+      void server.ensure().then(() => this.packagesInstalled(workspace))
+      return true
+    }
+    if (!this.stopForInstall(workspace)) return false
+    void this.ensure(workspace)
+    return true
   }
 
   /** Stop the workspace's preview Vite if it is running; true when it was. */
@@ -113,12 +124,16 @@ export class PreviewManager {
     return true
   }
 
-  /** The model wrote a file in `workspace` (any file tool or a template). */
-  modelWrote(sessionId: string | undefined, workspace: string): void {
+  /**
+   * The model wrote a file in `workspace` (any file tool or a template). `affectsPreview` is false
+   * for files the preview cannot show (README, package.json…), so the tab's watchdog skips them.
+   */
+  modelWrote(sessionId: string | undefined, workspace: string, affectsPreview = true): void {
     if (!sessionId) return
     const s = this.session(sessionId)
     s.workspace ??= workspace
     s.lastWriteAt = this.now()
+    if (affectsPreview) s.previewWriteAt = s.lastWriteAt
     s.seen.clear()
     s.pending = []
   }
@@ -175,7 +190,7 @@ export class PreviewManager {
       preview,
       verify: (s.workspace && this.verify.get(s.workspace)) || NONE,
       openSeq: s.openSeq,
-      ...(s.lastWriteAt ? { lastWriteAt: s.lastWriteAt } : {}),
+      ...(s.previewWriteAt ? { lastWriteAt: s.previewWriteAt } : {}),
     }
   }
 

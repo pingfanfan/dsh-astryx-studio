@@ -17,6 +17,8 @@ export interface Config {
   prefsFile: string
   /** Chrome / Chromium / Edge binary for astryx_screenshot; empty means auto-detect the installed one. */
   chromePath: string
+  /** Locale of built-in component text in scaffolded apps (e.g. zh-CN, en); empty for none. */
+  locale: string
 }
 
 export const Config: Schema<Config> = Schema.object({
@@ -28,6 +30,10 @@ export const Config: Schema<Config> = Schema.object({
   maxReportedErrors: Schema.natural().default(5).description('Max findings quoted per verify message.'),
   prefsFile: Schema.string().default('').description('Preview toolbar prefs file (default: $DSH_HOME/astryx-studio/prefs.json).'),
   chromePath: Schema.string().default('').description('Chrome/Chromium/Edge binary for astryx_screenshot (default: auto-detect).'),
+  locale: Schema.string()
+    .pattern(/^(?:[a-z]{2}(?:-[A-Z]{2})?)?$/)
+    .default('zh-CN')
+    .description('Locale of built-in component text (必填/可选, dates…) in scaffolded apps, e.g. zh-CN or en; empty for none.'),
 }) as Schema<Config>
 
 export const DEFAULT_CONFIG: Config = {
@@ -39,4 +45,5 @@ export const DEFAULT_CONFIG: Config = {
   maxReportedErrors: 5,
   prefsFile: '',
   chromePath: '',
+  locale: 'zh-CN',
 }

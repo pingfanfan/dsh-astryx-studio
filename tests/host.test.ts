@@ -198,3 +198,16 @@ describe('tools/post-execute + agent/pre-step', () => {
     expect(s2.messages).toEqual([])
   })
 })
+
+describe('affectsPreview', () => {
+  it('counts code and styles under src/ only', async () => {
+    const { affectsPreview } = await import('../src/index.js')
+    expect(affectsPreview('/w', '/w/src/pages/main/page.tsx')).toBe(true)
+    expect(affectsPreview('/w', '/w/src/index.css')).toBe(true)
+    expect(affectsPreview('/w', '/w/src/data/items.json')).toBe(true)
+    expect(affectsPreview('/w', '/w/README.md')).toBe(false)
+    expect(affectsPreview('/w', '/w/package.json')).toBe(false)
+    expect(affectsPreview('/w', '/w/src/notes.md')).toBe(false)
+    expect(affectsPreview('/w', '/w/srcx/a.tsx')).toBe(false)
+  })
+})

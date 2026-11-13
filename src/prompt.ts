@@ -21,7 +21,7 @@ export const PROMPT_TEXT = [
   '5. 每次写入后会收到 `astryx verify` 结果：✗ 时按报错修复后再继续；✓ 表示语法、lint 和 tsc 都通过。',
   '6. 主题、暗色和预览宽度由预览工具条控制，不要为此改代码，除非用户明确要求写死。',
   '7. 中文文案通常比英文长 30–50%，替换文案后注意别撑破卡片和按钮。',
-  '8. 插件建的项目里，`src/main.tsx` 已经包好 `<Theme>` 和 CSS（Vite 下不要加 `@astryxdesign/core/astryx.css`，它在 StyleX 构建里解析不到），只改页面文件。',
+  '8. 插件建的项目里，`src/main.tsx` 已经包好 `<Theme>`、CSS 和 `zh-CN` 的 `InternationalizationProvider`（组件内置文案如必填/可选、日期已是中文，页面里不用再包；Vite 下不要加 `@astryxdesign/core/astryx.css`，它在 StyleX 构建里解析不到），只改页面文件。',
   '9. 要看页面实际长什么样（布局、溢出、中文折行），调 `astryx_screenshot(width)` 截预览，再用 `read_image` 看返回的图片。常用宽度 1440 / 768 / 390。不要自己起浏览器、静态服务器或写截图脚本。',
   '',
   `Astryx playbook rules (from @astryxdesign/cli ${catalog.cliVersion}):`,

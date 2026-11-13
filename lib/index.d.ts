@@ -69,6 +69,8 @@ export interface Config {
   prefsFile: string;
   /** Chrome / Chromium / Edge binary for astryx_screenshot; empty means auto-detect the installed one. */
   chromePath: string;
+  /** Locale of built-in component text in scaffolded apps (e.g. zh-CN, en); empty for none. */
+  locale: string;
 }
 export declare const Config: Schema<Config>;
 interface RunResult {
@@ -163,6 +165,8 @@ declare module '@deepseek-ai/dsh-llm' {
   }
 }
 export declare function verifyMessage(body: string): UserMessage;
+/** Whether a written file can change the preview: code or styles under the workspace's src/. */
+export declare function affectsPreview(workspace: string, file: string): boolean;
 /** Test seam: replace process spawning and the CLI. */
 export interface Overrides {
   run?: Runner;

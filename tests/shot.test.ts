@@ -50,3 +50,25 @@ describe.skipIf(!chrome)('captureScreenshot (real headless Chrome)', () => {
     expect(existsSync(out)).toBe(true)
   }, 60_000)
 })
+
+describe('captureScreenshot cleanup', () => {
+  it('kills a browser that never reports DevTools, instead of leaking it', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'fake-chrome-'))
+    const pidFile = join(dir, 'pid')
+    const fake = join(dir, 'chrome.sh')
+    const { writeFileSync, chmodSync } = await import('node:fs')
+    writeFileSync(fake, `#!/bin/sh\necho $$ > "${pidFile}"\nexec sleep 30\n`)
+    chmodSync(fake, 0o755)
+    const out = join(dir, 'x.png')
+    await expect(captureScreenshot({ chrome: fake, url: 'about:blank', width: 400, out, timeoutMs: 1500 })).rejects.toThrow(/did not start/)
+    const pid = Number(readFileSync(pidFile, 'utf8'))
+    await new Promise((r) => setTimeout(r, 300))
+    let alive = true
+    try {
+      process.kill(pid, 0)
+    } catch {
+      alive = false
+    }
+    expect(alive).toBe(false)
+  }, 20_000)
+})

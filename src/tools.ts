@@ -9,7 +9,7 @@ import { describeError, PLUGIN_ROOT, SEARCH_DOMAINS, type AstryxApi, type Search
 import type { Config } from './config.js'
 import catalog from './generated/catalog.json' with { type: 'json' }
 import type { Runner } from './proc.js'
-import { detectWorkspace, isPlaceholder, pickPackageManager, planInstall, resolveInside, scaffold } from './workspace.js'
+import { detectWorkspace, isPlaceholder, pickPackageManager, planInstall, resolveInside, scaffold, toPosix } from './workspace.js'
 import { readFileSync } from 'node:fs'
 import type { TscScheduler } from './verify/tsc.js'
 import { THEMES } from './shared/preview-protocol.js'
@@ -240,6 +240,7 @@ export function createTools(env: ToolEnv): ToolDefinition[] {
           packageManager: env.config.packageManager,
           timeoutMs: env.config.installTimeoutMs,
           signal: exec.signal,
+          locale: env.config.locale,
         })
         if (s.install.code !== 0) {
           throw new Error(`${s.packageManager} install in ${dir} failed:\n${(s.install.stderr || s.install.stdout).slice(-1500)}`)
@@ -273,7 +274,7 @@ export function createTools(env: ToolEnv): ToolDefinition[] {
       }
       // Warm the incremental tsc cache in the background (first run 15–40 s).
       void env.tsc.schedule(workspace)
-      env.onTemplate?.(exec, workspace, targetPath, installed.length > 0)
+      env.onTemplate?.(exec, workspace, toPosix(targetPath), installed.length > 0)
       const value: TemplateValue = {
         template: id,
         file: targetPath,

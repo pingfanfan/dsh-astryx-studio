@@ -47,6 +47,11 @@ export function resolveInside(workspace: string, path: string): string {
   return abs
 }
 
+/** A workspace-relative path with `/` separators (page paths travel in URLs; Windows gives `\`). */
+export function toPosix(path: string): string {
+  return path.split(sep).join('/')
+}
+
 export const PLACEHOLDER_PAGE = 'src/pages/main/page.tsx'
 export const PLACEHOLDER_SOURCE = [
   '// astryx-studio placeholder: astryx_template replaces this file.',
@@ -73,7 +78,25 @@ export function isPlaceholder(file: string): boolean {
   }
 }
 
-export function scaffoldFiles(name: string): Record<string, string> {
+/** Astryx locales the scaffold and the preview accept (core ships `locales/<id>.generated.js`). */
+export const LOCALE_PATTERN = /^[a-z]{2}(?:-[A-Z]{2})?$/
+
+/** Module with the built-in component messages for `locale`. */
+export function localeModule(locale: string): string {
+  return `@astryxdesign/core/locales/${locale}.generated.js`
+}
+
+/**
+ * The locale an app's entry wraps its page in (`<InternationalizationProvider locale="zh-CN" …>`),
+ * so the preview can mirror it. Undefined when the entry sets none (or not as a literal).
+ */
+export function entryLocale(mainSource: string): string | undefined {
+  const m = /<InternationalizationProvider\b[^>]*\blocale=["']([\w-]+)["']/.exec(mainSource)
+  return m && LOCALE_PATTERN.test(m[1]!) ? m[1] : undefined
+}
+
+export function scaffoldFiles(name: string, locale = ''): Record<string, string> {
+  if (locale && !LOCALE_PATTERN.test(locale)) throw new Error(`invalid locale "${locale}" (expected e.g. zh-CN)`)
   const v = ASTRYX_VERSION
   const pkg = {
     name,
@@ -153,6 +176,8 @@ export function scaffoldFiles(name: string): Record<string, string> {
       "import {StrictMode} from 'react';",
       "import {createRoot} from 'react-dom/client';",
       "import {Theme} from '@astryxdesign/core/theme';",
+      ...(locale ? ["import {InternationalizationProvider} from '@astryxdesign/core/i18n';"] : []),
+      ...(locale ? [`import messages from '${localeModule(locale)}';`] : []),
       "import {neutralTheme} from '@astryxdesign/theme-neutral/built';",
       // No '@astryxdesign/core/astryx.css': astryxStylex resolves core to its src/, where that file does not exist
       // (the official apps/example-vite does not import it either; StyleX compiles the component styles).
@@ -164,7 +189,14 @@ export function scaffoldFiles(name: string): Record<string, string> {
       "createRoot(document.getElementById('root')!).render(",
       '  <StrictMode>',
       '    <Theme theme={neutralTheme}>',
-      '      <Page />',
+      ...(locale
+        ? [
+            // Built-in component text (必填/可选, dates, pagination…) in the page's language.
+            `      <InternationalizationProvider locale="${locale}" messages={{'${locale}': messages}}>`,
+            '        <Page />',
+            '      </InternationalizationProvider>',
+          ]
+        : ['      <Page />']),
       '    </Theme>',
       '  </StrictMode>,',
       ');',
@@ -203,12 +235,14 @@ export async function scaffold(
     packageManager: 'auto' | 'pnpm' | 'npm'
     timeoutMs: number
     signal?: AbortSignal | undefined
+    /** Locale the app's entry wraps the page in; empty for none. */
+    locale?: string
   },
 ): Promise<ScaffoldResult> {
   if (existsSync(join(dir, 'package.json'))) {
     throw new Error(`${dir} already has a package.json that does not depend on @astryxdesign/core; refusing to overwrite it`)
   }
-  const files = scaffoldFiles(dir.split(sep).pop() || 'astryx-app')
+  const files = scaffoldFiles(dir.split(sep).pop() || 'astryx-app', options.locale ?? '')
   for (const [rel, text] of Object.entries(files)) {
     const file = join(dir, rel)
     mkdirSync(resolve(file, '..'), { recursive: true })

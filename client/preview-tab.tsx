@@ -93,20 +93,23 @@ export function PreviewView(props: PreviewFace) {
   // dependencies mid-load), so reload it rather than show an old page.
   const [reloadKey, setReloadKey] = useState(0)
   const lastSignal = useRef(0)
-  const seenWrite = useRef<number | undefined>(undefined)
+  // The first status is the baseline (a write from before the tab opened is not watched); any
+  // later change is a new write, including the first write ever (undefined -> a time).
+  const seenWrite = useRef<{ at: number | undefined } | undefined>(undefined)
+  const hasStatus = status !== undefined
   const lastWriteAt = status?.lastWriteAt
   useEffect(() => {
-    if (lastWriteAt === undefined) return
-    const first = seenWrite.current === undefined
-    if (seenWrite.current === lastWriteAt) return
-    seenWrite.current = lastWriteAt
-    if (first) return
+    if (!hasStatus) return
+    const baseline = seenWrite.current === undefined
+    if (!baseline && seenWrite.current!.at === lastWriteAt) return
+    seenWrite.current = { at: lastWriteAt }
+    if (baseline || lastWriteAt === undefined) return
     const noticedAt = Date.now()
     const timer = setTimeout(() => {
       if (lastSignal.current < noticedAt - HMR_SIGNAL_SLACK_MS) setReloadKey((k) => k + 1)
     }, HMR_WATCHDOG_MS)
     return () => clearTimeout(timer)
-  }, [lastWriteAt])
+  }, [hasStatus, lastWriteAt])
 
   const sendPrefs = useCallback(() => {
     const cmd: PreviewCommand = { source: PREVIEW_COMMAND_SOURCE, type: 'set', theme: prefs.get().theme, dark: prefs.get().dark }
