@@ -160,10 +160,27 @@ describe('review fixes', () => {
     expect(await verifier.afterWrite({ callId: 'm1', name: 'apply_patch', value, cwd: ws, workspace: ws, agentId: 'a1' })).toEqual([])
   })
 
-  it('skips apply_patch operations that did not complete', () => {
-    expect(writesFromValue('apply_patch', { operations: [{ kind: 'update', path: 'a.tsx', status: 'failed' }, { kind: 'add', path: 'b.tsx', status: 'completed' }] }, '/w')).toEqual([
-      { file: '/w/b.tsx', from: '/w/b.tsx' },
+  it('skips apply_patch operations that never ran, but checks failed ones (they may have written)', () => {
+    const ops = [
+      { kind: 'update', path: 'a.tsx', status: 'skipped' },
+      { kind: 'move', path: 'b.tsx', destination: 'c.tsx', status: 'failed' },
+      { kind: 'add', path: 'd.tsx', status: 'completed' },
+    ]
+    expect(writesFromValue('apply_patch', { operations: ops }, '/w')).toEqual([
+      { file: '/w/c.tsx', from: '/w/b.tsx' },
+      { file: '/w/d.tsx', from: '/w/d.tsx' },
     ])
+  })
+
+  it('a second write hides the older tsc result; the agent waits for the newer run', async () => {
+    const { ws, calls, verifier } = setup()
+    const file = join(ws, 'src/page.tsx')
+    await verifier.afterWrite({ callId: 'w1', name: 'write', value: { path: file }, cwd: ws, workspace: ws, agentId: 'a1' })
+    calls[0]!.resolve(ok({ ms: 100 }))
+    await tick()
+    await verifier.afterWrite({ callId: 'w2', name: 'write', value: { path: file }, cwd: ws, workspace: ws, agentId: 'a1' })
+    setTimeout(() => calls[1]!.resolve(ok({ code: 2, ms: 200, stdout: `src/page.tsx(1,1): error TS1: newer.` })), 20)
+    expect((await verifier.collect('a1', 2000))?.outcome.kind).toBe('fail')
   })
 
   it('snapshots are keyed by any property key (DSH execution tokens are symbols)', async () => {

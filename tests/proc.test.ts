@@ -40,6 +40,14 @@ describe('runProcess (real child processes)', () => {
     expect(r.ms).toBeLessThan(8000)
   }, 10_000)
 
+  it('settles after the child exits even if a grandchild keeps the pipes open', async () => {
+    if (process.platform === 'win32') return
+    const script = 'require("child_process").spawn(process.execPath, ["-e", "setTimeout(() => {}, 20000)"], { stdio: "inherit" }).unref(); process.exit(0)'
+    const r = await runProcess(node, ['-e', script], { cwd })
+    expect(r.code).toBe(0)
+    expect(r.ms).toBeLessThan(8000)
+  }, 10_000)
+
   it('rejects when the command cannot be spawned', async () => {
     await expect(runProcess('astryx-no-such-command-xyz', [], { cwd })).rejects.toThrow(/ENOENT/)
   })

@@ -23,14 +23,14 @@ Found by testing 0.1.0 end to end in DSH; details and before/after runs in [docs
 - A page that does not compile now shows its error in the preview, instead of "No page at …". Page paths may contain Chinese or spaces, and Windows paths work.
 - `astryx_screenshot` no longer leaks Chrome when it fails to start, and cleaning up its profile can no longer crash the Host.
 - The write check (`astryx verify`) is more accurate:
-  - A file renamed with `apply_patch` is compared with its old contents, not treated as new. Patch operations that did not complete are skipped.
-  - Each tool execution keeps its own "before" snapshot, even when two calls share an id, and stale snapshots expire after 10 minutes.
-  - A `<div>` in a comment and spacing like `style = {{` no longer change the counts.
+  - A file renamed with `apply_patch` is compared with its old contents, not treated as new. Operations that failed partway are still checked, since they may have written; skipped ones are not.
+  - Each tool execution keeps its own "before" snapshot, even when two calls share an id. Only the newest 64 are kept, so abandoned ones cannot pile up.
+  - A `<div>` in a comment and spacing like `style = {{` no longer change the counts. When one side has a syntax error, both sides are counted the same way.
   - A write that fixes a syntax error is not blamed for imports the file already had.
-  - When the parent agent and a subagent both write in a workspace, each one sees the next tsc result, instead of whoever asked first taking it.
+  - When the parent agent and a subagent both write in a workspace, each one sees the next tsc result, instead of whoever asked first taking it. After a new write, the older result is never handed out in place of the run in flight.
   - A tsc run that cannot start (for example, in a read-only workspace) shows as "unverified" instead of an unhandled error. Windows tsc paths are shown relative to the workspace.
 
-- An install or tsc run that times out or is cancelled is killed with SIGKILL if it ignores SIGTERM for 3 s, so it can no longer hold the tool call forever.
+- An install or tsc run that times out or is cancelled is killed with SIGKILL if it ignores SIGTERM for 3 s. A run also settles 2 s after its process exits, even if a grandchild still holds its output open, so it can no longer hold the tool call forever. On Windows, `node` is spawned directly, without `cmd.exe` in between.
 
 - Windows: `pnpm`/`npm` run through `cmd.exe` with quoted arguments, and Vite and tsc run from their JavaScript entries with `node`, because Node cannot spawn `.cmd` shims directly. Unit-tested only; not yet run on Windows.
 

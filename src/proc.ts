@@ -22,6 +22,8 @@ export type Runner = (command: string, args: readonly string[], options: RunOpti
 
 /** How long a killed child gets to exit on SIGTERM before SIGKILL. */
 export const KILL_GRACE_MS = 3000
+/** How long output may keep arriving after the child exited before the result settles. */
+const DRAIN_MS = 2000
 
 /** Spawn a process, collect output, honour abort and timeout. Never rejects on a non-zero exit. */
 export const runProcess: Runner = (command, args, options) =>
@@ -71,10 +73,26 @@ export const runProcess: Runner = (command, args, options) =>
       options.signal?.removeEventListener('abort', onAbort)
       reject(error)
     })
-    child.on('close', (code) => {
+    let settled = false
+    let drain: ReturnType<typeof setTimeout> | undefined
+    const finish = (code: number | null) => {
+      if (settled) return
+      settled = true
       if (timer) clearTimeout(timer)
       if (force) clearTimeout(force)
+      if (drain) clearTimeout(drain)
       options.signal?.removeEventListener('abort', onAbort)
       resolvePromise({ code, stdout, stderr, timedOut, aborted, ms: Date.now() - started })
+    }
+    child.on('close', (code) => finish(code))
+    // 'close' waits for the pipes; a grandchild (pnpm under cmd.exe) can keep them open after the
+    // child itself exited. Settle shortly after 'exit' then.
+    child.on('exit', (code) => {
+      drain = setTimeout(() => {
+        child.stdout.destroy()
+        child.stderr.destroy()
+        finish(code)
+      }, DRAIN_MS)
+      drain.unref?.()
     })
   })

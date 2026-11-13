@@ -141,8 +141,13 @@ export async function lintDiff(
   file = 'page.tsx',
 ): Promise<LintFinding[]> {
   const findings: LintFinding[] = []
-  const a = await countLintCode(before, file)
-  const b = await countLintCode(after, file)
+  // Both sides on one basis: if either does not parse, both are counted as raw text (a comment
+  // mentioning <div> must not count on one side only).
+  const na = await normalizeForCount(before, file)
+  const nb = await normalizeForCount(after, file)
+  const same = na !== undefined && nb !== undefined
+  const a = countLint(same ? na : before)
+  const b = countLint(same ? nb : after)
   for (const key of Object.keys(COUNTERS) as (keyof LintCounts)[]) {
     if (b[key] > a[key]) {
       findings.push({ rule: key, message: `${LABEL[key]} count ${a[key]} → ${b[key]}: ${HINT[key]}` })
@@ -150,7 +155,7 @@ export async function lintDiff(
   }
   // A broken `before` (the write fixes a syntax error) keeps its imports by a text scan, so the
   // fix is not blamed for imports that were already there.
-  const beforeParses = before === '' || (await normalizeForCount(before, file)) !== undefined
+  const beforeParses = na !== undefined
   const had = new Set((beforeParses ? await importSpecifiers(before, file) : importSpecifiersByText(before)).map(packageRoot))
   const added = new Set<string>()
   for (const spec of await importSpecifiers(after, file)) {

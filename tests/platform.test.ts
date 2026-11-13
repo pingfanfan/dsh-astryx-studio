@@ -30,6 +30,7 @@ describe('launching on Windows (command lines only; not run on Windows yet)', ()
       args: ['--headless=new'],
     })
     expect(launch('node.exe', ['x.js'], 'win32').command).toBe('node.exe')
+    expect(launch('node', ['x.js'], 'win32')).toEqual({ command: 'node', args: ['x.js'] }) // node.exe, no cmd.exe in between
   })
 
   it('quotes arguments the way the Windows C runtime parses them, then escapes cmd metacharacters', () => {

@@ -59,4 +59,11 @@ describe('lint review fixes', () => {
     const after = `import x from 'lodash'\nexport default function P() { return <>{x}</> }\n`
     expect(await lintDiff(before, after, undefined, 'p.tsx')).toEqual([])
   })
+
+  it('when one side does not parse, both sides are counted the same way', async () => {
+    const body = `// TODO <div>\nexport default function P() { return <div><div/><div/></div> }\n`
+    const broken = body.replace('</div> }', '</div>') + '<div>'
+    // 3 real divs plus a comment, then one real div added and a syntax error: one more, not two.
+    expect((await lintDiff(body, broken, undefined, 'p.tsx')).filter((f) => f.rule === 'div')[0]?.message).toMatch(/4 → 5/)
+  })
 })

@@ -61,8 +61,9 @@ export function writesFromValue(name: string, value: unknown, cwd: string | unde
   if (name === 'apply_patch' && Array.isArray(v.operations)) {
     const out: { file: string; from: string }[] = []
     for (const op of v.operations as Record<string, unknown>[]) {
-      if (op.kind === 'delete') continue
-      if (typeof op.status === 'string' && op.status !== 'completed') continue
+      if (op.kind === 'delete' || op.status === 'skipped') continue
+      // A failed or unknown op may still have written (a move whose source delete failed): check
+      // what it wrote. A file it never touched reads back unchanged and reports nothing new.
       const src = typeof op.path === 'string' ? abs(op.path) : undefined
       const dest = typeof op.destination === 'string' ? abs(op.destination) : src
       if (dest) out.push({ file: dest, from: src ?? dest })
@@ -97,7 +98,16 @@ export interface VerifierDeps {
   readonly onStatus?: (workspace: string, status: { state: 'running' | 'pass' | 'fail' | 'unverified'; summary: string }) => void
 }
 
-const SNAPSHOT_TTL_MS = 10 * 60_000
+const MAX_SNAPSHOTS = 64
+const MAX_AGENTS = 256
+
+/** Drop the oldest entries (insertion order) until at most `max` remain. */
+function capMap<K, V>(map: Map<K, V>, max: number): void {
+  for (const k of map.keys()) {
+    if (map.size <= max) break
+    map.delete(k)
+  }
+}
 
 const defaultRead = (file: string) => (existsSync(file) ? readFileSync(file, 'utf8') : undefined)
 
@@ -119,9 +129,10 @@ export class Verifier {
   /** Before a file tool runs: remember the current contents of the files it names. */
   snapshot(key: PropertyKey, name: string, args: unknown, cwd: string | undefined): void {
     if (!isFileTool(name)) return
-    // A call whose post-execute never ran (another hook threw) must not keep file contents forever.
+    // A call whose post-execute never ran (another hook threw) must not keep file contents
+    // forever: keep only the newest snapshots (a long approval prompt must not lose its own).
     const now = Date.now()
-    for (const [k, s] of this.snapshots) if (now - s.at > SNAPSHOT_TTL_MS) this.snapshots.delete(k)
+    capMap(this.snapshots, MAX_SNAPSHOTS - 1)
     const files = new Map<string, string>()
     for (const p of pathsFromArgs(name, args)) {
       const abs = cwd ? resolve(cwd, p) : resolve(p)
@@ -161,13 +172,21 @@ export class Verifier {
       const lint = await lintDiff(before.get(from) ?? before.get(file) ?? '', after, undefined, file)
       if (syntax.length > 0 || lint.length > 0) reports.push({ file: relative(workspace, file), syntax, lint })
     }
-    if (input.agentId) this.agentWorkspace.set(input.agentId, workspace)
+    if (input.agentId) {
+      // Re-insert so the map's order is recency; subagent ids must not pile up over a session.
+      this.agentWorkspace.delete(input.agentId)
+      this.agentWorkspace.set(input.agentId, workspace)
+      capMap(this.agentWorkspace, MAX_AGENTS)
+      capMap(this.seen, MAX_AGENTS)
+    }
     this.deps.onStatus?.(workspace, reports.length > 0
       ? { state: 'fail', summary: this.formatReports(reports).split('\n').slice(1, 3).join(' · ') }
       : { state: 'running', summary: 'tsc …' })
     // Syntax errors make tsc noise; still start it so the newest write always owns the run.
     const syncFailed = reports.length > 0
     const gen = ++this.generation
+    // The result of an older run predates this write: nobody may take it while the new run goes.
+    this.latest.delete(workspace)
     void this.deps.tsc
       .schedule(workspace)
       .then((outcome) => {

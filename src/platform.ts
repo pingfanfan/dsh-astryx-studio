@@ -38,7 +38,8 @@ export function quoteWindowsArg(arg: string): string {
  * `.exe` files are spawned directly.
  */
 export function launch(command: string, args: readonly string[], platform: NodeJS.Platform = process.platform, env: NodeJS.ProcessEnv = process.env): Launch {
-  const bare = !/[\\/]/.test(command) && !/\.(exe|com)$/i.test(command)
+  // node is node.exe: spawned directly, so a kill reaches it rather than a cmd.exe in between.
+  const bare = !/[\\/]/.test(command) && !/\.(exe|com)$/i.test(command) && command !== 'node'
   if (platform !== 'win32' || !bare) return { command, args: [...args] }
   const line = [command.replace(CMD_META, '^$1'), ...args.map(quoteWindowsArg)].join(' ')
   return { command: env['ComSpec'] ?? 'cmd.exe', args: ['/d', '/s', '/c', `"${line}"`], windowsVerbatimArguments: true }
