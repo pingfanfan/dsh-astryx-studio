@@ -44,7 +44,7 @@
 
 ## 安装（开发）
 
-需要 dsh `>=0.2.2-rc.1 <0.3.0`。
+需要 dsh `>=0.2.2-rc.1 <0.3.0`。已在 macOS 上测试；Linux 应该可用（CI 在 Linux 上跑单元测试）。Windows 未测试：插件不经 shell 直接启动 `pnpm`、`node_modules/.bin/vite` 和 `.bin/tsc`，而 Windows 的 `.cmd` 启动脚本不允许这样调用。
 
 ```sh
 pnpm install && pnpm run build

@@ -44,7 +44,7 @@ Screenshots: [docs/preview-day2.md](docs/preview-day2.md), [docs/gallery-day3.md
 
 ## Install (development)
 
-Requires dsh `>=0.2.2-rc.1 <0.3.0`.
+Requires dsh `>=0.2.2-rc.1 <0.3.0`. Tested on macOS; Linux should work (CI runs the unit tests there). Windows is untested: the plugin starts `pnpm`, `node_modules/.bin/vite` and `.bin/tsc` without a shell, which Windows `.cmd` shims do not allow.
 
 ```sh
 pnpm install && pnpm run build
