@@ -8,6 +8,7 @@ Found by testing 0.1.0 end to end in DSH; details and before/after runs in [docs
 
 - `astryx_screenshot(width?, full_page?, page?, theme?, dark?)`: full-page PNG of the live preview at an exact viewport width through the installed Chrome / Chromium / Edge (DevTools protocol, no Playwright). It returns the path for DSH's `read_image` plus the page's console errors. The prompt tells the model to use it instead of starting its own browser. New option `chromePath`.
 - The template gallery searches in Chinese: 表格, 看板, 登录表单 and similar terms map to the English words the templates use.
+- Option `locale` (default `zh-CN`): scaffolded apps wrap the page in `InternationalizationProvider`, so built-in component text (必填/可选, dates) matches the page's language. The preview follows the app's own entry.
 
 ### Fixed
 
@@ -17,6 +18,8 @@ Found by testing 0.1.0 end to end in DSH; details and before/after runs in [docs
 - After `astryx_template` or a `bash` command installs packages, the running preview Vite restarts, because Vite caches failed resolutions.
 - The tab reloads the iframe if a model write gets no HMR update within 4 s.
 - The gallery's "no matching templates" message sat at the bottom of an empty grid. It now sits under the toolbar, with a clear-search button.
+- A page that does not compile now shows its error in the preview, instead of "No page at …". Page paths may contain Chinese or spaces, and Windows paths work.
+- `astryx_screenshot` no longer leaks Chrome when it fails to start, and cleaning up its profile can no longer crash the Host.
 
 ## 0.1.0 — 2026-11-08
 

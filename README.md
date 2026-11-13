@@ -53,7 +53,22 @@ dsh plugin --profile dev add .
 dsh --profile dev --no-open
 ```
 
-Expected: the five `astryx_*` tools in the tool list. Ask for a page and the **Astryx 预览** tab opens with the live preview.
+Expected: the six `astryx_*` tools in the tool list (five where no Chrome-family browser is installed). Ask for a page and the **Astryx 预览** tab opens with the live preview.
+
+## Options
+
+Set on the plugin row in a profile patch (`cordis.patch.yml`).
+
+| Option | Default | Meaning |
+|---|---|---|
+| `appDir` | `astryx-app` | Folder the scaffold creates under the session folder when it is not an Astryx project. |
+| `packageManager` | `auto` | `auto` (pnpm when on PATH, else npm), `pnpm` or `npm`. |
+| `locale` | `zh-CN` | Locale of built-in component text (必填/可选, dates…) in scaffolded apps; empty for none. The preview follows the app's own `src/main.tsx`. |
+| `chromePath` | auto-detect | Chrome / Chromium / Edge binary for `astryx_screenshot`. |
+| `installTimeoutMs` | `300000` | Scaffold and template install timeout. |
+| `tscTimeoutMs` / `tscStepWaitMs` | `30000` / `5000` | tsc budget, and how long the next agent step waits for a run in flight. |
+| `maxReportedErrors` | `5` | Findings quoted per verify message. |
+| `prefsFile` | `$DSH_HOME/astryx-studio/prefs.json` | Where the preview toolbar choice is kept. |
 
 ## Layout
 

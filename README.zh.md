@@ -53,7 +53,22 @@ dsh plugin --profile dev add .
 dsh --profile dev --no-open
 ```
 
-预期：工具列表里出现 5 个 `astryx_*` 工具。让模型做一个页面后，会自动打开 **Astryx 预览** tab 显示实时预览。
+预期：工具列表里出现 6 个 `astryx_*` 工具（本机没有 Chrome 系浏览器时是 5 个）。让模型做一个页面后，会自动打开 **Astryx 预览** tab 显示实时预览。
+
+## 选项
+
+在 profile 的 patch（`cordis.patch.yml`）里给插件那一行设置。
+
+| 选项 | 默认值 | 说明 |
+|---|---|---|
+| `appDir` | `astryx-app` | 会话目录不是 Astryx 项目时，脚手架在其下创建的文件夹。 |
+| `packageManager` | `auto` | `auto`（PATH 里有 pnpm 就用 pnpm，否则 npm）、`pnpm` 或 `npm`。 |
+| `locale` | `zh-CN` | 脚手架项目里组件内置文案（必填/可选、日期等）的语言；留空则不设置。预览跟随项目自己的 `src/main.tsx`。 |
+| `chromePath` | 自动查找 | `astryx_screenshot` 使用的 Chrome / Chromium / Edge 路径。 |
+| `installTimeoutMs` | `300000` | 脚手架和模板安装的超时。 |
+| `tscTimeoutMs` / `tscStepWaitMs` | `30000` / `5000` | tsc 的时间预算，以及下一步最多等多久正在跑的 tsc。 |
+| `maxReportedErrors` | `5` | 每条 verify 消息最多引用几条问题。 |
+| `prefsFile` | `$DSH_HOME/astryx-studio/prefs.json` | 预览工具条选择的保存位置。 |
 
 ## 目录
 
