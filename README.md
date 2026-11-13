@@ -36,7 +36,7 @@ A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`) pl
 
 **Template gallery.** The **Astryx 模板画廊** tab (also reachable from the preview toolbar) shows all 57 page templates with thumbnails, category filters and search in English or Chinese (表格, 看板, 登录表单 map to the English words the templates use). Clicking one sends 「用 `<id>` 模板开始」 as an ordinary user turn: the model still decides where the page goes and runs `astryx_template`. The toolbar choice (theme, dark mode, width) is also kept in `$DSH_HOME/astryx-studio/prefs.json`, so it survives a DSH restart on another port.
 
-Screenshots: [docs/preview-day2.md](docs/preview-day2.md), [docs/gallery-day3.md](docs/gallery-day3.md).
+Screenshots: [docs/preview-day2.md](docs/preview-day2.md), [docs/gallery-day3.md](docs/gallery-day3.md). Preview fixes and `astryx_screenshot`, with before/after runs: [docs/preview-fixes.md](docs/preview-fixes.md).
 
 `@astryxdesign/cli`, `core`, `build`, the 7 themes and the scaffold are pinned to the same version (0.7.11).
 

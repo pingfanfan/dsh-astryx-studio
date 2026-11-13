@@ -36,7 +36,7 @@
 
 **模板画廊。** 「Astryx 模板画廊」tab（也可以从预览工具条打开）展示全部 57 个页面模板，带缩略图、分类筛选和搜索；搜索支持中文（表格、看板、登录表单会映射到模板里用的英文词）。点一张卡片，会以普通用户消息的形式发送「用 `<id>` 模板开始」：放在哪、怎么写仍由模型决定并调用 `astryx_template`。工具条的选择（主题、暗色、宽度）同时保存在 `$DSH_HOME/astryx-studio/prefs.json`，DSH 换端口重启后也能恢复。
 
-截图见 [docs/preview-day2.md](docs/preview-day2.md)、[docs/gallery-day3.md](docs/gallery-day3.md)。
+截图见 [docs/preview-day2.md](docs/preview-day2.md)、[docs/gallery-day3.md](docs/gallery-day3.md)。预览修复和 `astryx_screenshot` 的前后对比测试见 [docs/preview-fixes.md](docs/preview-fixes.md)。
 
 `@astryxdesign/cli`、`core`、`build`、7 套主题和脚手架锁在同一版本（0.7.11）。
 
