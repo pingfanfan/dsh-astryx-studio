@@ -29,7 +29,8 @@
     "icon.svg",
     "README.md",
     "README.zh.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "license": "MIT",
   "author": "pingfanfan",

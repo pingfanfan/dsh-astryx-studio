@@ -115,6 +115,9 @@ const KEYS = Object.keys(ZH_TERMS).sort((a, b) => b.length - a.length)
 export function expandSearchWord(word: string): string[][] {
   const w = word.toLowerCase()
   if (!CJK.test(w)) return [[w]]
+  // Mixed words (login表单, 表格tree): each non-Chinese run is a word of its own.
+  const runs = w.match(/[㐀-鿿]+|[^㐀-鿿]+/g) ?? []
+  if (runs.length > 1) return runs.filter((r) => r.trim()).flatMap(expandSearchWord)
   const groups: string[][] = []
   let i = 0
   while (i < w.length) {

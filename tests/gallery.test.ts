@@ -56,6 +56,9 @@ describe('Chinese term map', () => {
     expect(expandSearchWord('单点登录').map((g) => g[0])).toEqual(['单点登录'])
     expect(expandSearchWord('做一个数据看板').map((g) => g[0])).toEqual(['数据看板'])
     expect(expandSearchWord('量子')).toEqual([['量子']])
+    // Mixed words keep their English part as its own word.
+    expect(expandSearchWord('login表单').map((g) => g[0])).toEqual(['login', '表单'])
+    expect(expandSearchWord('表格tree').map((g) => g[0])).toEqual(['表格', 'tree'])
   })
   it('every term maps to lowercase English words', () => {
     for (const [k, v] of Object.entries(ZH_TERMS)) {
