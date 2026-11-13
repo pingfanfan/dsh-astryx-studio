@@ -127,7 +127,7 @@ const manifest = Object.fromEntries(
     }
   }),
 )
-writeFileSync(join(outDir, 'manifest.json'), JSON.stringify({ cliVersion: catalog.cliVersion, width: 480, height: 300, sizes: manifest }, null, 2) + '\n')
+writeFileSync(join(outDir, 'manifest.json'), JSON.stringify({ cliVersion: catalog.cliVersion, width: 480, height: 300, sizes: manifest, format: 'webp' }, null, 2) + '\n')
 const total = Object.values(manifest).reduce((a, b) => a + b, 0)
 console.log(`\n${Object.values(manifest).filter(Boolean).length}/${catalog.templates.length} thumbnails, ${(total / 1024).toFixed(0)} KiB total`)
 if (failures.length) console.log(`failures:\n${failures.join('\n')}`)
