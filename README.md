@@ -100,7 +100,18 @@ Set on the plugin row in a profile patch (`cordis.patch.yml`).
 
 ## Scripts
 
-`pnpm run typecheck` · `pnpm run build` · `pnpm test` · `pnpm run check` (all three)
+`pnpm run typecheck` · `pnpm run build` · `pnpm test` · `pnpm run check` (all three) · `pnpm run e2e`
+
+## Testing
+
+- **Unit tests** (`pnpm test`, about 10 s): every tool and hook with a fake CLI and process runner. `tests/shot.test.ts` drives the installed Chrome and is skipped where none is found.
+- **End to end** (`pnpm run e2e`, about 1 min, needs the network): a real scaffold, template, install and tsc. Then the real preview Vite: the `/@fs` allow-list is checked, and headless Chrome must see the generated harness report ready at 390 px.
+- **By hand in DSH**, after `pnpm run build`:
+  1. Start DSH with `dsh --profile dev --no-open`. The `dev` profile links this checkout, and DSH loads `lib/` at startup, so restart it after every build.
+  2. Register an empty folder as a workspace, start a session in it and ask for a page in Chinese.
+  3. Watch the preview tab follow the model's writes. The template rewrite is the case that used to go stale.
+  4. Check that the model uses `astryx_screenshot` + `read_image` rather than its own browser. See [docs/preview-fixes.md](docs/preview-fixes.md) for what good runs look like.
+  5. Model runs spend the DeepSeek API, so most checks need none: the toolbar, the gallery, a page with a syntax error, a page added while Vite runs, and `kill -9` on the preview Vite.
 
 ## License
 
