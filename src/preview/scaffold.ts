@@ -371,15 +371,28 @@ export function writePreviewHarness(workspace: string): string[] {
   return written
 }
 
+/** The @astryxdesign/core version installed in the workspace, if any. */
+export function installedCoreVersion(workspace: string): string | undefined {
+  try {
+    const v = (JSON.parse(readFileSync(join(workspace, 'node_modules', '@astryxdesign', 'core', 'package.json'), 'utf8')) as { version?: unknown }).version
+    return typeof v === 'string' && /^\d+\.\d+\.\d+/.test(v) ? v : undefined
+  } catch {
+    return undefined
+  }
+}
+
 /** Packages the harness imports that the workspace does not have installed yet. */
 export function missingPreviewPackages(workspace: string): string[] {
   const needed = [...THEMES.map(themePackage), '@astryxdesign/build', '@vitejs/plugin-react', 'vite']
   return needed.filter((p) => !existsSync(join(workspace, 'node_modules', p, 'package.json')))
 }
 
-/** Install spec for a missing package (themes and build pinned to the CLI version). */
-export function installSpec(pkg: string): string {
-  if (pkg.startsWith('@astryxdesign/')) return `${pkg}@${ASTRYX_VERSION}`
+/**
+ * Install spec for a missing package. Themes and build must match the workspace's own Core exactly
+ * (each pins it), so a project made with an older plugin keeps its version; else the CLI version.
+ */
+export function installSpec(pkg: string, workspace?: string): string {
+  if (pkg.startsWith('@astryxdesign/')) return `${pkg}@${(workspace && installedCoreVersion(workspace)) || ASTRYX_VERSION}`
   if (pkg === '@vitejs/plugin-react') return `${pkg}@^5.2.0`
   if (pkg === 'vite') return `${pkg}@^8.1.3`
   return pkg

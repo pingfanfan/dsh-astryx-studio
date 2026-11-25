@@ -45,6 +45,9 @@ export const ZH_TERMS: Readonly<Record<string, readonly string[]>> = {
   商品: ['product'],
   课程: ['course'],
   报名: ['enroll', 'course'],
+  // A sign-up form is any form, not only the course page.
+  报名表单: ['form', 'enroll'],
+  活动报名: ['form', 'enroll'],
   产品: ['product'],
   电商: ['product', 'checkout', 'cart'],
   商城: ['product'],

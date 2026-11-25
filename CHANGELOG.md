@@ -16,6 +16,8 @@ Found by testing 0.1.0 end to end in DSH; details and before/after runs in [docs
 
 ### Fixed
 
+- A project made with an earlier plugin version keeps its own Astryx version when the preview installs the extra themes it needs. Before, the preview could ask for themes of a newer version that the project's packages refused, and the preview would not start.
+- Searching the gallery for 报名表单 or 活动报名 shows the ordinary form templates as well as the course page.
 - The test suite passes on Windows: tests build paths the platform's way. tsc diagnostics show forward-slash paths on every platform, and a write to `src/../x.tsx` no longer counts as a preview change.
 - The preview tab kept showing the template after the model rewrote the page with a different default component. Harness v5 swaps in the HMR-updated page module.
 - Pages created while the preview Vite runs showed "No page at …". Pages now load by absolute `/@fs` URL.

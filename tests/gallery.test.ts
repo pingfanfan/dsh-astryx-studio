@@ -41,6 +41,9 @@ describe('gallery filtering (client)', () => {
     const wizardForms = ids('分步表单')
     expect(wizardForms).toEqual(expect.arrayContaining(['form-wizard', 'form-wizard-vertical']))
     expect(wizardForms).not.toContain('contact-form')
+    // 报名 alone is the course page; a sign-up form is any form.
+    expect(ids('课程报名')).toEqual(['course-detail'])
+    for (const q of ['报名表单', '活动报名', '活动报名表单']) expect(ids(q), q).toEqual(expect.arrayContaining(['contact-form', 'course-detail']))
     // Mixed Chinese and English words.
     expect(ids('表格 tree')).toEqual(['table-tree'])
     // Unknown Chinese stays as itself and simply finds nothing.

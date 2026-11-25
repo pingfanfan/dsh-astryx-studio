@@ -251,7 +251,7 @@ export class PreviewManager {
         // runProcess rejects when it cannot spawn (no pnpm on PATH): treat that as a failure
         // too, never as a rejection escaping the `void ensure()` callers.
         const tryRun = (pm: 'pnpm' | 'npm') =>
-          this.opts.run(pm, addArgs(pm, missing.map(installSpec)), { cwd: workspace, timeoutMs: this.opts.installTimeoutMs }).catch((e: unknown) => ({
+          this.opts.run(pm, addArgs(pm, missing.map((p) => installSpec(p, workspace))), { cwd: workspace, timeoutMs: this.opts.installTimeoutMs }).catch((e: unknown) => ({
             code: -1,
             stdout: '',
             stderr: e instanceof Error ? e.message : String(e),

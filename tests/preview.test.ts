@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { packageBin } from '../src/platform.js'
 import { describe, expect, it, vi } from 'vitest'
 import { formatRuntimeErrors, installsPackages, PreviewManager } from '../src/preview/manager.js'
-import { LOAD_RETRY_DELAYS, missingPreviewPackages, PREVIEW_DIR, previewFiles, writePreviewHarness } from '../src/preview/scaffold.js'
+import { installSpec, LOAD_RETRY_DELAYS, missingPreviewPackages, PREVIEW_DIR, previewFiles, writePreviewHarness } from '../src/preview/scaffold.js'
 import { parseVitePort, PreviewServer, type SpawnedProcess, type Spawner } from '../src/preview/server.js'
 import { createRpcHandler, fetchRoutes } from '../src/rpc.js'
 import { THEMES } from '../src/shared/preview-protocol.js'
@@ -369,6 +369,18 @@ describe('preview manager', () => {
     m.modelWrote('s', '/w')
     m.setVerify('/w', { state: 'pass', summary: 'astryx verify ✓ (tsc 0.6s)' })
     expect(m.status('s').verify).toMatchObject({ state: 'pass', summary: 'astryx verify ✓ (tsc 0.6s)', at: 1000 })
+  })
+})
+
+describe('preview install specs', () => {
+  it('pins Astryx packages to the Core the workspace already has (an older project keeps its version)', () => {
+    const ws = tempProject()
+    expect(installSpec('@astryxdesign/theme-butter', ws)).toBe(`@astryxdesign/theme-butter@${ASTRYX_VERSION}`)
+    mkdirSync(join(ws, 'node_modules/@astryxdesign/core'), { recursive: true })
+    writeFileSync(join(ws, 'node_modules/@astryxdesign/core/package.json'), JSON.stringify({ name: '@astryxdesign/core', version: '0.7.11' }))
+    expect(installSpec('@astryxdesign/theme-butter', ws)).toBe('@astryxdesign/theme-butter@0.7.11')
+    expect(installSpec('@astryxdesign/build', ws)).toBe('@astryxdesign/build@0.7.11')
+    expect(installSpec('vite', ws)).toBe('vite@^8.1.3')
   })
 })
 
