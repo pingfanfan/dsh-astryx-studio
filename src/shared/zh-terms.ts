@@ -43,6 +43,8 @@ export const ZH_TERMS: Readonly<Record<string, readonly string[]>> = {
   购物车: ['cart', 'checkout'],
   订单: ['order', 'checkout'],
   商品: ['product'],
+  课程: ['course'],
+  报名: ['enroll', 'course'],
   产品: ['product'],
   电商: ['product', 'checkout', 'cart'],
   商城: ['product'],

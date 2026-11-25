@@ -23,7 +23,7 @@
 
 **验证钩子。** 对 Astryx 工作区里 `.ts/.tsx` 的 `write` / `edit` / `apply_patch` / `str_replace_editor` 写入：
 
-- **同步**（毫秒级，随工具结果返回 `astryx verify ✗`）：esbuild 语法检查，加 lint 计数差：一次写入不能让 `<div>`、`style={{}}`、`stylex.create` 的数量增加，也不能新增白名单（`@astryxdesign/*`、`@stylexjs/stylex`、`react`、`react-dom`、`@heroicons/react`、`lucide-react`、`recharts`）以外的 import。计数只看代码，注释不算；用 `apply_patch` 改名的文件和改名前的内容比较。已在 `@astryxdesign/cli` 0.7.11 的全部 57 个页面模板上校准到零误报，见 [docs/lint-calibration.md](docs/lint-calibration.md)。
+- **同步**（毫秒级，随工具结果返回 `astryx verify ✗`）：esbuild 语法检查，加 lint 计数差：一次写入不能让 `<div>`、`style={{}}`、`stylex.create` 的数量增加，也不能新增白名单（`@astryxdesign/*`、`@stylexjs/stylex`、`react`、`react-dom`、`@heroicons/react`、`lucide-react`、`recharts`）以外的 import。计数只看代码，注释不算；用 `apply_patch` 改名的文件和改名前的内容比较。已在 `@astryxdesign/cli` 0.7.16 的全部 58 个页面模板上校准到零误报，见 [docs/lint-calibration.md](docs/lint-calibration.md)。
 - **异步**：`tsc --noEmit --incremental`，同一工作区同一时刻只跑一个，新的写入会取消正在跑的那次；最新结果在每个写过这个工作区的 agent（包括子 agent）的下一步开头注入（`astryx verify ✓ (tsc 0.6s)` 或 TS 报错）；如果 tsc 还在跑，下一步最多等 `tscStepWaitMs`（5 秒），这样模型改完就收尾时也能收到结论。端到端证据见 [docs/e2e-day1.md](docs/e2e-day1.md)。
 
 **Prompt 和 skill。** 一个内容固定的 prompt section（`build()` 的 playbook 规则加中文工作流），以及 `astryx-page` skill（模板选型表和全部模板清单）。
@@ -37,11 +37,11 @@
 - **页面运行时错误**会显示在 tab 里。只有发生在模型最后一次写入之后的错误，才会在模型下一步注入，同一个错误只注入一次。
 - **首次加载。** Vite 启动时一次性预构建 harness 和全部页面的依赖。页面模块*获取失败*（依赖还在安装）时，预览显示等待提示并按退避重试约 50 秒，仍失败才报告。`astryx_template` 或 `bash` 命令（`pnpm add`、`npm install` 等）在一个预览 Vite 正在运行的工作区里装包或删包时，那个 Vite 会重启。页面按绝对 `/@fs` 路径加载，所以预览运行期间模型新建的页面也能显示。模型写入后 4 秒内 iframe 没收到热更新，tab 会自动重载 iframe。
 
-**模板画廊。** 「Astryx 模板画廊」tab（也可以从预览工具条打开）展示全部 57 个页面模板，带缩略图、分类筛选和搜索；搜索支持中文（表格、看板、登录表单会映射到模板里用的英文词）。点一张卡片，会以普通用户消息的形式发送「用 `<id>` 模板开始」：放在哪、怎么写仍由模型决定并调用 `astryx_template`。工具条的选择（主题、暗色、宽度）同时保存在 `$DSH_HOME/astryx-studio/prefs.json`，DSH 换端口重启后也能恢复。
+**模板画廊。** 「Astryx 模板画廊」tab（也可以从预览工具条打开）展示全部 58 个页面模板，带缩略图、分类筛选和搜索；搜索支持中文（表格、看板、登录表单会映射到模板里用的英文词）。点一张卡片，会以普通用户消息的形式发送「用 `<id>` 模板开始」：放在哪、怎么写仍由模型决定并调用 `astryx_template`。工具条的选择（主题、暗色、宽度）同时保存在 `$DSH_HOME/astryx-studio/prefs.json`，DSH 换端口重启后也能恢复。
 
 截图见 [docs/preview-day2.md](docs/preview-day2.md)、[docs/gallery-day3.md](docs/gallery-day3.md)。预览修复和 `astryx_screenshot` 的前后对比测试见 [docs/preview-fixes.md](docs/preview-fixes.md)。
 
-`@astryxdesign/cli`、`core`、`build`、7 套主题和脚手架锁在同一版本（0.7.11）。
+`@astryxdesign/cli`、`core`、`build`、7 套主题和脚手架锁在同一版本（0.7.16）。
 
 ## 安装（开发）
 
@@ -88,13 +88,13 @@ dsh --profile dev --no-open
 | `client/index.tsx`、`client/gallery-tab.tsx` | Web client 侧：`astryx-preview` 和 `astryx-gallery` 两种 tab 及其 Body（中文搜索词表在 `src/shared/zh-terms.ts`） |
 | `scripts/build.mjs` | 用 tsdown 构建 `lib/index.js`（ESM）和 `lib/client.js`（ModuleLoader factory） |
 | `cordis.patch.yml` | 组合包配置层，插入 `astryx-studio` 这一行 |
-| `tests/` | 每个工具和钩子的单测、57 个模板的 lint 校准、client 冒烟测试；`ASTRYX_E2E=1` 跑真实的脚手架 → 模板 → tsc → 预览 Vite → 无头 Chrome 集成测试 |
+| `tests/` | 每个工具和钩子的单测、58 个模板的 lint 校准、client 冒烟测试；`ASTRYX_E2E=1` 跑真实的脚手架 → 模板 → tsc → 预览 Vite → 无头 Chrome 集成测试 |
 
 `lib/` 随仓库提交，本地 checkout 和 git 安装都不用再跑构建。
 
 ## 发布前生成的资源
 
-- `pnpm exec tsx scripts/gen-thumbs.ts`：用 Playwright 和 `cwebp` 重新生成 `assets/thumbs/*.webp`（57 张 480×300，约 0.4 MiB；没装 `cwebp`（`brew install webp`）时保留 PNG）。
+- `pnpm exec tsx scripts/gen-thumbs.ts`：用 Playwright 和 `cwebp` 重新生成 `assets/thumbs/*.webp`（58 张 480×300，约 0.4 MiB；没装 `cwebp`（`brew install webp`）时保留 PNG）。
 - `node scripts/gen-preview-svg.mjs`：重新生成 `docs/preview.svg` 和 `docs/preview.zh.svg`（Plugin Manager 详情页配图，文字用 Noto Sans CJK SC 转成路径）。
 - `node scripts/gen-catalog.mjs`（`pnpm run build` 会自动运行）：从锁定版本的 CLI 生成 playbook 规则和模板目录。
 

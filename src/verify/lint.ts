@@ -21,7 +21,7 @@ export const IMPORT_WHITELIST: readonly string[] = [
   'react-dom',
   '@heroicons/react',
   'lucide-react',
-  // dashboard / chart templates import recharts directly (9 imports across the 0.7.11 templates).
+  // dashboard / chart templates import recharts directly (see docs/lint-calibration.md).
   'recharts',
 ]
 

@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { ASTRYX_VERSION } from '../src/workspace.js'
 import { join } from 'node:path'
 import { packageBin } from '../src/platform.js'
 import { describe, expect, it, vi } from 'vitest'
@@ -217,7 +218,7 @@ describe('preview manager', () => {
     expect(m.status('s1')).toMatchObject({ workspace: ws, page: 'src/pages/main/page.tsx', openSeq: 1 })
     await vi.waitFor(() => expect(runner.calls).toHaveLength(1))
     expect(runner.calls[0]!.command).toBe('pnpm')
-    expect(runner.calls[0]!.args).toContain('@astryxdesign/theme-butter@0.7.11')
+    expect(runner.calls[0]!.args).toContain(`@astryxdesign/theme-butter@${ASTRYX_VERSION}`)
     expect(existsSync(join(ws, '.astryx-studio/main.tsx'))).toBe(true)
     runner.calls[0]!.resolve(ok())
     await vi.waitFor(() => expect(procs).toHaveLength(1))

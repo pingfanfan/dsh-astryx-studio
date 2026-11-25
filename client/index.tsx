@@ -98,7 +98,7 @@ export function apply(ctx: Context) {
         id: GALLERY_TAB_ID,
         kind: GALLERY_TAB_KIND,
         title: () => GALLERY_TITLE,
-        guide: [{ id: 'gallery', order: 61, title: () => GALLERY_TITLE, description: () => '57 个页面模板，点一下让模型从它开始' }],
+        guide: [{ id: 'gallery', order: 61, title: () => GALLERY_TITLE, description: () => 'Astryx 页面模板，点一下让模型从它开始' }],
       }),
     'astryx-studio: gallery tab type',
   )

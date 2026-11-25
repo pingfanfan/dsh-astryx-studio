@@ -8,6 +8,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { template } from '@astryxdesign/cli/api'
 import catalog from '../src/generated/catalog.json' with { type: 'json' }
 import { PLUGIN_ROOT } from '../src/astryx.js'
+import { LONG_TEMPLATES, STYLEX_TEMPLATES } from '../src/prompt.js'
 import { countLint, lintDiff } from '../src/verify/lint.js'
 import { checkSyntax } from '../src/verify/syntax.js'
 
@@ -39,6 +40,10 @@ describe(`lint calibration over ${catalog.templates.length} page templates (cli 
     if (process.env.CALIBRATION_WRITE === '1') writeDoc(rows)
     expect(rows).toHaveLength(catalog.templates.length)
     expect(bad).toEqual([])
+    // The skill text names these; after a CLI upgrade copy the values below into src/prompt.ts.
+    expect(STYLEX_TEMPLATES, 'STYLEX_TEMPLATES in src/prompt.ts').toEqual(rows.filter((r) => r.stylexCreate > 0).map((r) => r.id))
+    const longest = [...rows].sort((a, b) => b.lines - a.lines).slice(0, LONG_TEMPLATES.length).map((r) => [r.id, r.lines])
+    expect(LONG_TEMPLATES, 'LONG_TEMPLATES in src/prompt.ts').toEqual(longest)
   })
 })
 

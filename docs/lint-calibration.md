@@ -1,6 +1,6 @@
 # Lint calibration
 
-@astryxdesign/cli 0.7.11, 57 page templates, written with `template()` exactly as `astryx_template` writes them. Regenerate: `CALIBRATION_WRITE=1 pnpm vitest run tests/calibration.test.ts`.
+@astryxdesign/cli 0.7.16, 58 page templates, written with `template()` exactly as `astryx_template` writes them. Regenerate: `CALIBRATION_WRITE=1 pnpm vitest run tests/calibration.test.ts`.
 
 | Check | False positives |
 |---|---|
@@ -16,13 +16,13 @@ Changes made during calibration:
 
 Why the rule is a count-diff and not a ban (absolute counts in the original templates):
 
-- `<div>`: 32 occurrences in 12 templates
-- `style={{}}`: 16 in 7 templates
+- `<div>`: 19 occurrences in 11 templates
+- `style={{}}`: 8 in 5 templates
 - `stylex.create`: 27 in 15 templates
 
 | Template | Lines | `<div>` | `style={{}}` | `stylex.create` |
 |---|---|---|---|---|
-| ai-chat | 764 | 0 | 0 | 0 |
+| ai-chat | 782 | 0 | 0 | 0 |
 | ai-chat-landing | 470 | 0 | 0 | 0 |
 | dashboard | 804 | 0 | 3 | 0 |
 | login | 98 | 0 | 0 | 0 |
@@ -36,20 +36,21 @@ Why the rule is a count-diff and not a ban (absolute counts in the original temp
 | table-collapsible | 1475 | 0 | 0 | 1 |
 | table-comparison | 1459 | 0 | 0 | 1 |
 | contact-form | 293 | 0 | 0 | 0 |
+| course-detail | 700 | 0 | 0 | 0 |
 | dashboard-comparison | 895 | 1 | 0 | 2 |
 | form-wizard-dialog | 588 | 0 | 0 | 0 |
 | documentation | 273 | 0 | 0 | 0 |
 | documentation-design | 758 | 0 | 0 | 0 |
 | documentation-technical | 257 | 0 | 0 | 0 |
 | dashboard-scorecard | 875 | 0 | 0 | 2 |
-| file-explorer | 539 | 0 | 2 | 0 |
-| table-filter | 4632 | 0 | 0 | 3 |
+| file-explorer | 563 | 0 | 0 | 0 |
+| table-filter | 4624 | 0 | 0 | 3 |
 | form-wizard | 841 | 0 | 0 | 0 |
 | dashboard-cohort-funnel | 915 | 0 | 0 | 1 |
-| gallery-hero | 95 | 0 | 0 | 0 |
-| table-grouped | 1219 | 0 | 0 | 0 |
+| gallery-hero | 101 | 0 | 0 | 0 |
+| table-grouped | 1147 | 0 | 0 | 0 |
 | ide | 464 | 1 | 2 | 0 |
-| table-inbox | 2705 | 0 | 0 | 1 |
+| table-inbox | 2702 | 0 | 0 | 1 |
 | incident-console | 581 | 0 | 0 | 0 |
 | form-wizard-inline | 936 | 0 | 1 | 0 |
 | kanban-board | 754 | 0 | 0 | 1 |
@@ -73,7 +74,7 @@ Why the rule is a count-diff and not a ban (absolute counts in the original temp
 | side-gallery | 143 | 0 | 0 | 0 |
 | shell-side-nav | 242 | 0 | 0 | 0 |
 | table | 86 | 0 | 0 | 0 |
-| theme-showcase | 1293 | 13 | 6 | 0 |
+| theme-showcase | 1287 | 0 | 0 | 0 |
 | shell-top-nav | 225 | 0 | 0 | 1 |
 | table-tree | 1705 | 0 | 0 | 1 |
 | form-two-column | 241 | 0 | 0 | 0 |

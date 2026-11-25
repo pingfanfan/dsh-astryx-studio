@@ -23,7 +23,7 @@ A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`) pl
 
 **Verify hook.** For `write` / `edit` / `apply_patch` / `str_replace_editor` on `.ts/.tsx` inside the Astryx workspace:
 
-- **Synchronous** (milliseconds, returned with the tool result as `astryx verify ✗`): an esbuild syntax check and a lint count-diff. A write may not increase the number of `<div>`, `style={{}}` or `stylex.create`, and may not add an import outside `@astryxdesign/*`, `@stylexjs/stylex`, `react`, `react-dom`, `@heroicons/react`, `lucide-react`, `recharts`. Counts are taken on the code, so comments do not count, and a file renamed with `apply_patch` is compared with its old contents. Calibrated to zero false positives on all 57 page templates of `@astryxdesign/cli` 0.7.11, see [docs/lint-calibration.md](docs/lint-calibration.md).
+- **Synchronous** (milliseconds, returned with the tool result as `astryx verify ✗`): an esbuild syntax check and a lint count-diff. A write may not increase the number of `<div>`, `style={{}}` or `stylex.create`, and may not add an import outside `@astryxdesign/*`, `@stylexjs/stylex`, `react`, `react-dom`, `@heroicons/react`, `lucide-react`, `recharts`. Counts are taken on the code, so comments do not count, and a file renamed with `apply_patch` is compared with its old contents. Calibrated to zero false positives on all 58 page templates of `@astryxdesign/cli` 0.7.16, see [docs/lint-calibration.md](docs/lint-calibration.md).
 - **Asynchronous**: `tsc --noEmit --incremental`, one run per workspace at a time; a new write cancels the run in flight. The newest result is injected at the next step of each agent that wrote in the workspace, a subagent included (`astryx verify ✓ (tsc 0.6s)` or the TS errors); that step waits up to `tscStepWaitMs` (5 s) for a run still in flight, so a model that edits and immediately finishes still gets the verdict. End-to-end evidence: [docs/e2e-day1.md](docs/e2e-day1.md).
 
 **Prompt and skill.** A stable prompt section (the playbook rules from `build()` plus the Chinese workflow), and an `astryx-page` skill with a template selection table and the full template list.
@@ -37,11 +37,11 @@ A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`) pl
 - **Runtime errors** in the page show in the tab. They reach the model at its next step only if they happened after its last write, and each distinct error only once.
 - **First load.** Vite optimizes every dependency of the harness and the pages in one pass at startup. A page module that fails to *fetch* (packages still installing) is retried with backoff for about 50 s behind a waiting message, and only then reported. When `astryx_template` or a `bash` command (`pnpm add`, `npm install`, …) installs or removes packages in a workspace whose preview Vite is running, that Vite restarts. Pages load by absolute `/@fs` URL, so a page the model adds while the preview runs shows up too. If a model write gets no HMR update within 4 s, the tab reloads the iframe.
 
-**Template gallery.** The **Astryx 模板画廊** tab (also reachable from the preview toolbar) shows all 57 page templates with thumbnails, category filters and search in English or Chinese (表格, 看板, 登录表单 map to the English words the templates use). Clicking one sends 「用 `<id>` 模板开始」 as an ordinary user turn: the model still decides where the page goes and runs `astryx_template`. The toolbar choice (theme, dark mode, width) is also kept in `$DSH_HOME/astryx-studio/prefs.json`, so it survives a DSH restart on another port.
+**Template gallery.** The **Astryx 模板画廊** tab (also reachable from the preview toolbar) shows all 58 page templates with thumbnails, category filters and search in English or Chinese (表格, 看板, 登录表单 map to the English words the templates use). Clicking one sends 「用 `<id>` 模板开始」 as an ordinary user turn: the model still decides where the page goes and runs `astryx_template`. The toolbar choice (theme, dark mode, width) is also kept in `$DSH_HOME/astryx-studio/prefs.json`, so it survives a DSH restart on another port.
 
 Screenshots: [docs/preview-day2.md](docs/preview-day2.md), [docs/gallery-day3.md](docs/gallery-day3.md). Preview fixes and `astryx_screenshot`, with before/after runs: [docs/preview-fixes.md](docs/preview-fixes.md).
 
-`@astryxdesign/cli`, `core`, `build`, the 7 themes and the scaffold are pinned to the same version (0.7.11).
+`@astryxdesign/cli`, `core`, `build`, the 7 themes and the scaffold are pinned to the same version (0.7.16).
 
 ## Install (development)
 
@@ -88,13 +88,13 @@ Set on the plugin row in a profile patch (`cordis.patch.yml`).
 | `client/index.tsx`, `client/gallery-tab.tsx` | Web client half: `astryx-preview` and `astryx-gallery` tab types and bodies (Chinese search terms in `src/shared/zh-terms.ts`) |
 | `scripts/build.mjs` | tsdown build to `lib/index.js` (ESM) and `lib/client.js` (a ModuleLoader factory) |
 | `cordis.patch.yml` | Bundle layer that inserts the plugin row `astryx-studio` |
-| `tests/` | Unit tests per tool and hook, lint calibration over 57 templates, client smoke test; `ASTRYX_E2E=1` runs a real scaffold → template → tsc → preview Vite → headless-Chrome integration |
+| `tests/` | Unit tests per tool and hook, lint calibration over 58 templates, client smoke test; `ASTRYX_E2E=1` runs a real scaffold → template → tsc → preview Vite → headless-Chrome integration |
 
 `lib/` is committed so local-checkout and git installs need no build step.
 
 ## Release-time assets
 
-- `pnpm exec tsx scripts/gen-thumbs.ts`: regenerates `assets/thumbs/*.webp` (57 × 480×300, about 0.4 MiB) with Playwright and `cwebp` (`brew install webp`; without it the PNGs are kept).
+- `pnpm exec tsx scripts/gen-thumbs.ts`: regenerates `assets/thumbs/*.webp` (58 × 480×300, about 0.4 MiB) with Playwright and `cwebp` (`brew install webp`; without it the PNGs are kept).
 - `node scripts/gen-preview-svg.mjs`: regenerates `docs/preview.svg` and `docs/preview.zh.svg` (Plugin Manager detail images, lettering outlined from Noto Sans CJK SC).
 - `node scripts/gen-catalog.mjs` (run by `pnpm run build`): the playbook rules and template catalog from the pinned CLI.
 

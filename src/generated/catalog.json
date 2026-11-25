@@ -1,5 +1,5 @@
 {
-  "cliVersion": "0.7.11",
+  "cliVersion": "0.7.16",
   "rules": [
     "Start every page from a page template. Never lay out a page from scratch.",
     "Changing a page you already have? Keep it. Add blocks and components inside its sections.",
@@ -92,6 +92,12 @@
       "name": "Contact Form",
       "category": "Form",
       "description": "Flat single-column form mixing control types (text, pill toggles, dropdowns, long free-text) landing on one full-width submit."
+    },
+    {
+      "id": "course-detail",
+      "name": "Course Detail",
+      "category": "Content",
+      "description": "Long-form sales page for a single offering, in two columns — read the pitch, then enroll from a sticky rail."
     },
     {
       "id": "dashboard-comparison",
@@ -318,8 +324,8 @@
     {
       "id": "theme-showcase",
       "name": "Theme Showcase",
-      "category": "Other",
-      "description": "Several unrelated product surfaces rendered together on one canvas so a token change can be judged across contexts at once."
+      "category": "Shell",
+      "description": "Multi-surface comparison shell: preview palettes, typography, icons and control states across a storefront, checkout, chat and inventory on one responsive canvas."
     },
     {
       "id": "shell-top-nav",

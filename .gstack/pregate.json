@@ -68,6 +68,9 @@
     ],
     "src/astryx.ts": [
       "tests/tools.test.ts"
+    ],
+    "assets/thumbs/**": [
+      "tests/gallery.test.ts"
     ]
   }
 }

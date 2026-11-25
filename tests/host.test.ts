@@ -71,7 +71,7 @@ describe('host plugin registration', () => {
     expect(named.length).toBeGreaterThan(15)
     for (const id of named) expect(ids.has(id), id).toBe(true)
     for (const id of [...STYLEX_TEMPLATES, ...LONG_TEMPLATES.map(([id]) => id)]) expect(ids.has(id), id).toBe(true)
-    expect(STYLEX_TEMPLATES).toHaveLength(15)
+    expect(SKILL_CONTENT).toContain(`StyleX 模板**（${STYLEX_TEMPLATES.length} 个`)
     expect(SKILL_CONTENT).toContain('中文文案长度')
     expect(SKILL_CONTENT).toContain('canvas-editor（2876 行）')
     expect(SKILL_CONTENT).toContain('StyleX 模板')

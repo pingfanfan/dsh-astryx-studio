@@ -6,6 +6,7 @@ Found by testing 0.1.0 end to end in DSH; details and before/after runs in [docs
 
 ### Added
 
+- Astryx updated to 0.7.16 (from 0.7.11). The template gallery has a new course page (`course-detail`): a long sales page for one course with a sign-up box on the side. Searching 课程 or 报名 finds it, and asking for 课程报名 or 课程详情 starts from it. A few existing templates were reworked upstream; their gallery thumbnails still show the earlier look. The edit checks still give zero false alarms on all 58 templates. (0.7.17 is skipped for now: its HTML export copies web images into the file, intranet ones included.)
 - The quick check that runs after every page edit now uses the newest esbuild, 0.28.2 (from 0.25). On a Mac the plugin now needs macOS 12 or later; Macs on macOS 11 should stay on the previous plugin version. Windows and Linux need nothing new beyond what Node.js 22 already asks for. The check now also follows one rare JavaScript rule it used to miss: a `using` or `await using` declaration written directly in a `switch` `case` or `default` is reported as an error.
 - `astryx_screenshot(width?, full_page?, page?, theme?, dark?)`: full-page PNG of the live preview at an exact viewport width through the installed Chrome / Chromium / Edge (DevTools protocol, no Playwright). It returns the path for DSH's `read_image` plus the page's console errors. The prompt tells the model to use it instead of starting its own browser. New option `chromePath`.
 - The template gallery searches in Chinese: 表格, 看板, 登录表单 and similar terms map to the English words the templates use.

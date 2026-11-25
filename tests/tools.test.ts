@@ -105,8 +105,9 @@ describe('astryx_search in Chinese', () => {
 describe('astryx_build', () => {
   it('maps Chinese keywords to English for the ranker (it cannot match Chinese) and says so', async () => {
     expect(englishKeywords('course sales dashboard')).toBe('course sales dashboard')
-    expect(englishKeywords('课程 销售 看板')).toBe('dashboard')
+    expect(englishKeywords('课程 销售 看板')).toBe('course dashboard')
     expect(englishKeywords('商品详情')).toBe('product detail')
+    expect(englishKeywords('课程报名')).toBe('course enroll')
     expect(englishKeywords('聊天助手')).toBe('chat')
     expect(englishKeywords('看板 revenue')).toBe('dashboard revenue')
     expect(englishKeywords('量子 纠缠')).toBe('量子 纠缠') // nothing known: passed through

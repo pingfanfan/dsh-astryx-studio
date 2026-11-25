@@ -30,18 +30,18 @@ export const PROMPT_TEXT = [
   `需要模板选型表或 StyleX 模板的注意事项时，加载 \`${SKILL_NAME}\` skill。`,
 ].join('\n')
 
-/** The 15 page templates that call stylex.create (lint calibration, cli 0.7.11). */
+/** The page templates that call stylex.create, in catalog order. tests/calibration.test.ts checks this against the pinned CLI. */
 export const STYLEX_TEMPLATES = [
   'canvas-editor', 'table-collapsible', 'table-comparison', 'dashboard-comparison', 'dashboard-scorecard',
   'table-filter', 'dashboard-cohort-funnel', 'table-inbox', 'kanban-board', 'dashboard-progress',
   'dashboard-alert-rail', 'settings-dialog', 'shell-top-nav', 'table-tree', 'work-item-detail',
 ] as const
 
-/** Templates long enough that reading them whole costs tens of thousands of tokens. */
+/** The six longest page templates and their line counts; reading them whole costs tens of thousands of tokens. tests/calibration.test.ts checks this against the pinned CLI. */
 export const LONG_TEMPLATES = [
-  ['table-filter', 4632],
+  ['table-filter', 4624],
   ['canvas-editor', 2876],
-  ['table-inbox', 2705],
+  ['table-inbox', 2702],
   ['settings-dialog', 2604],
   ['table-tree', 1705],
   ['dashboard-alert-rail', 1591],
@@ -64,6 +64,7 @@ export const REQUEST_TABLE: readonly (readonly [string, string])[] = [
   ['AI 对话 / 聊天', 'ai-chat（空状态首页用 ai-chat-landing）'],
   ['任务看板（Kanban）', 'kanban-board'],
   ['商品详情', 'product-detail'],
+  ['课程介绍 / 课程报名页', 'course-detail'],
   ['什么都不像', 'blank'],
 ]
 
@@ -87,7 +88,7 @@ export const SKILL_CONTENT = [
   '- 保留模板的页面框架、gap 和 padding；替换数据、文案和区块。',
   '- **中文文案长度**：同样意思的中文通常比英文模板文案长 30–50%。卡片标题、按钮、表头、徽章换成中文后，检查是否折行或撑破；优先用更短的说法，不要靠缩小字号或加 `style={{}}`。',
   `- **超长模板只读相关段落**：${LONG_TEMPLATES.map(([id, n]) => `${id}（${n} 行）`).join('、')} 读全文要几万 token。先 \`read\` 前 80 行看结构和 import，再用行范围只读要改的那一段，用 \`edit\` 精确替换，不要整文件 \`write\`。`,
-  `- **StyleX 模板**（15 个：${STYLEX_TEMPLATES.join('、')}）：可以改已有 \`stylex.create\` 对象里的值，但值必须是静态字面量（不能来自 props、变量或运算），也不要新增 \`stylex.create\` 调用，验证钩子会把新增计为违规。`,
+  `- **StyleX 模板**（${STYLEX_TEMPLATES.length} 个：${STYLEX_TEMPLATES.join('、')}）：可以改已有 \`stylex.create\` 对象里的值，但值必须是静态字面量（不能来自 props、变量或运算），也不要新增 \`stylex.create\` 调用，验证钩子会把新增计为违规。`,
   '- 加区块用已有组件，布局用 VStack/HStack/Grid/Card，不加 `<div>` 和 `style={{}}`。',
   '- import 只能来自 @astryxdesign/*、@stylexjs/stylex、react、@heroicons/react、lucide-react、recharts。',
   '',

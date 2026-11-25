@@ -111,8 +111,8 @@
     }
   },
   "dependencies": {
-    "@astryxdesign/cli": "0.7.11",
-    "@astryxdesign/core": "0.7.11",
+    "@astryxdesign/cli": "0.7.16",
+    "@astryxdesign/core": "0.7.16",
     "esbuild": "^0.28.2"
   },
   "pnpm": {
