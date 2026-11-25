@@ -371,14 +371,24 @@ export function writePreviewHarness(workspace: string): string[] {
   return written
 }
 
-/** The @astryxdesign/core version installed in the workspace, if any. */
+/**
+ * The workspace's @astryxdesign/core version: the installed one, else an exact version its
+ * package.json pins (a fresh checkout before install). Undefined when neither says.
+ */
 export function installedCoreVersion(workspace: string): string | undefined {
-  try {
-    const v = (JSON.parse(readFileSync(join(workspace, 'node_modules', '@astryxdesign', 'core', 'package.json'), 'utf8')) as { version?: unknown }).version
-    return typeof v === 'string' && /^\d+\.\d+\.\d+/.test(v) ? v : undefined
-  } catch {
-    return undefined
+  const exact = /^\d+\.\d+\.\d+(?:-[\w.]+)?$/
+  const read = (file: string): unknown => {
+    try {
+      return JSON.parse(readFileSync(file, 'utf8'))
+    } catch {
+      return undefined
+    }
   }
+  const installed = (read(join(workspace, 'node_modules', '@astryxdesign', 'core', 'package.json')) as { version?: unknown } | undefined)?.version
+  if (typeof installed === 'string' && exact.test(installed)) return installed
+  const pkg = read(join(workspace, 'package.json')) as { dependencies?: Record<string, unknown> } | undefined
+  const declared = pkg?.dependencies?.['@astryxdesign/core']
+  return typeof declared === 'string' && exact.test(declared) ? declared : undefined
 }
 
 /** Packages the harness imports that the workspace does not have installed yet. */

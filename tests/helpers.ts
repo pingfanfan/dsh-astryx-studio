@@ -1,3 +1,4 @@
+import { ASTRYX_VERSION } from '../src/workspace.js'
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -6,7 +7,7 @@ import type { Runner, RunResult } from '../src/proc.js'
 /** A temp folder; `astryx: true` makes it an Astryx workspace (package.json depends on core). */
 export function tempProject(files: Record<string, string> = {}, astryx = true): string {
   const dir = mkdtempSync(join(tmpdir(), 'astryx-studio-test-'))
-  if (astryx) files = { 'package.json': JSON.stringify({ dependencies: { '@astryxdesign/core': '0.7.11' } }), ...files }
+  if (astryx) files = { 'package.json': JSON.stringify({ dependencies: { '@astryxdesign/core': ASTRYX_VERSION } }), ...files }
   for (const [rel, text] of Object.entries(files)) {
     mkdirSync(dirname(join(dir, rel)), { recursive: true })
     writeFileSync(join(dir, rel), text)

@@ -374,8 +374,11 @@ describe('preview manager', () => {
 
 describe('preview install specs', () => {
   it('pins Astryx packages to the Core the workspace already has (an older project keeps its version)', () => {
-    const ws = tempProject()
+    const ws = tempProject({ 'package.json': JSON.stringify({ dependencies: { '@astryxdesign/core': '^0.7.0' } }) })
     expect(installSpec('@astryxdesign/theme-butter', ws)).toBe(`@astryxdesign/theme-butter@${ASTRYX_VERSION}`)
+    // A fresh checkout of an older project: no node_modules yet, Core pinned in package.json.
+    const fresh = tempProject({ 'package.json': JSON.stringify({ dependencies: { '@astryxdesign/core': '0.7.11' } }) })
+    expect(installSpec('@astryxdesign/theme-butter', fresh)).toBe('@astryxdesign/theme-butter@0.7.11')
     mkdirSync(join(ws, 'node_modules/@astryxdesign/core'), { recursive: true })
     writeFileSync(join(ws, 'node_modules/@astryxdesign/core/package.json'), JSON.stringify({ name: '@astryxdesign/core', version: '0.7.11' }))
     expect(installSpec('@astryxdesign/theme-butter', ws)).toBe('@astryxdesign/theme-butter@0.7.11')

@@ -33,7 +33,8 @@ export function categoriesOf(items: readonly GalleryItem[]): string[] {
  * term map, so 表格 finds table templates and 登录表单 needs both login and form.
  */
 export function filterGallery(items: readonly GalleryItem[], category: string, query: string): GalleryItem[] {
-  const groups = query.split(/\s+/).filter(Boolean).flatMap(expandSearchWord)
+  // Chinese words typed apart (报名 表单) read as one phrase; glued words still split into every term they hold.
+  const groups = query.replace(/([㐀-鿿])\s+(?=[㐀-鿿])/g, '$1').split(/\s+/).filter(Boolean).flatMap(expandSearchWord)
   return items.filter((i) => {
     if (category !== ALL && i.category !== category) return false
     const hay = `${i.id} ${i.name} ${i.description} ${i.category}`.toLowerCase()
