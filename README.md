@@ -45,7 +45,7 @@ Screenshots: [docs/preview-day2.md](docs/preview-day2.md), [docs/gallery-day3.md
 
 ## Install (development)
 
-Requires dsh `>=0.2.2-rc.1 <0.3.0`. Tested on macOS; Linux should work (CI runs the unit tests there). Windows is untested. On Windows the plugin runs `pnpm`/`npm` through `cmd.exe` with quoted arguments, and Vite and tsc from their JavaScript entries with `node` (no `.cmd` shims). These command lines are unit-tested, but they have not been run on Windows.
+Requires dsh `>=0.2.2-rc.1 <0.3.0`, Node.js 22 or later, and on a Mac macOS 12 or later (esbuild's binary needs it). Tested on macOS; Linux should work (CI runs the unit tests there). Windows is untested. On Windows the plugin runs `pnpm`/`npm` through `cmd.exe` with quoted arguments, and Vite and tsc from their JavaScript entries with `node` (no `.cmd` shims). These command lines are unit-tested, but they have not been run on Windows.
 
 ```sh
 pnpm install && pnpm run build
