@@ -6,7 +6,7 @@ Found by testing 0.1.0 end to end in DSH; details and before/after runs in [docs
 
 ### Added
 
-- The quick check that runs after every page edit now uses the newest esbuild, 0.28.2 (from 0.25). It works the same as before. It needs macOS 12 or later, or Linux kernel 3.2 or later.
+- The quick check that runs after every page edit now uses the newest esbuild, 0.28.2 (from 0.25). The plugin now needs macOS 12 or later, or Linux kernel 3.2 or later. One rare code pattern is now flagged as an error: a `using` declaration written directly in a `switch` case. Wrapping that case in braces fixes it.
 - `astryx_screenshot(width?, full_page?, page?, theme?, dark?)`: full-page PNG of the live preview at an exact viewport width through the installed Chrome / Chromium / Edge (DevTools protocol, no Playwright). It returns the path for DSH's `read_image` plus the page's console errors. The prompt tells the model to use it instead of starting its own browser. New option `chromePath`.
 - The template gallery searches in Chinese: 表格, 看板, 登录表单 and similar terms map to the English words the templates use.
 - `astryx_search` does the same: the CLI search found nothing for Chinese (表格, 弹窗, 日期选择: 0 results), and now searches table, dialog, date. The term map gained about 40 component words (日期, 标签页, 开关, 分页, 抽屉…).
